@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>THE BACKROOMS</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --panel: rgba(18, 16, 12, 0.8);
+      --amber: #f0c75f;
+      --amber-2: #d9a32e;
+      --paper: #d9d2ba;
+      --alarm: #ff5f52;
+      --green: #78d78d;
+      --cyan: #7dd3fc;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      color: var(--paper);
+      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+    }
+
+    body {
+      position: relative;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+      cursor: crosshair;
+    }
+
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .topbar {
+      position: absolute;
+      top: 18px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--amber);
+      font-size: 12px;
+    }
+
+    .topbar strong {
+      font-size: 18px;
+      letter-spacing: 0.02em;
+    }
+
+    .rightbar {
+      position: absolute;
+      top: 18px;
+      right: 20px;
+      text-align: right;
+      font-size: 12px;
+      color: var(--paper);
+      line-height: 1.5;
+    }
+
+    .meter {
+      width: min(280px, 32vw);
+      position: absolute;
+      left: 18px;
+      bottom: 18px;
+    }
+
+    .meter-row {
+      margin-top: 10px;
+    }
+
+    .label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-family: ui-monospace, monospace;
+      color: #beb69a;
+      margin-bottom: 4px;
+    }
+
+    .bar {
+      height: 8px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .fill {
+      height: 100%;
+      width: 100%;
+      transition: width 0.12s linear;
+    }
+
+    .health { background: linear-gradient(90deg, #3c6d4b, #7ecf8a); }
+    .light { background: linear-gradient(90deg, #6a5418, #f0c75f); }
+
+    #screen {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle at center, rgba(24,18,12,0.8), rgba(5,5,5,0.96));
+      transition: opacity 0.2s ease;
+    }
+
+    #screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .panel {
+      width: min(700px, 90vw);
+      padding: 28px 28px 22px;
+      background: rgba(15, 13, 10, 0.82);
+      border: 1px solid rgba(240, 199, 95, 0.25);
+      box-shadow: 0 0 35px rgba(240, 199, 95, 0.1);
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0;
+      color: var(--amber);
+      font-size: clamp(32px, 6vw, 64px);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+    }
+
+    .small {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.45em;
+      color: #8a815d;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    p {
+      margin: 18px auto 0;
+      max-width: 58ch;
+      color: #c1b89a;
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    .controls {
+      margin-top: 22px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(240, 199, 95, 0.7);
+      background: var(--amber);
+      color: #140f07;
+      font-weight: 700;
+      padding: 12px 22px;
+      border-radius: 0;
+      cursor: pointer;
+      transition: transform 0.12s ease, filter 0.12s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+
+    button.secondary {
+      background: transparent;
+      color: var(--amber);
+    }
+
+    .hint {
+      margin-top: 18px;
+      font-size: 12px;
+      opacity: 0.8;
+      color: #a59671;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    #message {
+      position: fixed;
+      left: 50%;
+      top: 62%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.56);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--paper);
+      padding: 8px 14px;
+      font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 11;
+      transition: opacity 0.18s ease;
+    }
+
+    #message.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <div class="topbar">
+      <span>LEVEL 01</span>
+      <strong id="levelName">Lobby</strong>
+    </div>
+
+    <div class="rightbar">
+      <div id="statusKeys">KEYS: 0</div>
+      <div id="statusGoal">EXIT: CLOSED</div>
+      <div id="statusWeapon">FLASHLIGHT: ON</div>
+    </div>
+
+    <div class="meter">
+      <div class="meter-row">
+        <div class="label"><span>Sanity</span><span id="sanityValue">100%</span></div>
+        <div class="bar"><div id="sanityFill" class="fill health"></div></div>
+      </div>
+      <div class="meter-row">
+        <div class="label"><span>Light</span><span id="lightValue">100%</span></div>
+        <div class="bar"><div id="lightFill" class="fill light"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen">
+    <div class="panel">
+      <h1><span class="small">No Clip Detected</span>THE BACKROOMS</h1>
+      <p>
+        You wake in a place that should not exist. The carpet is damp, the ceiling hums,
+        and every corridor looks like it was copied from a memory no one remembers making.
+        Find the exit. Keep your sanity. Do not let the things in the walls notice you.
+      </p>
+      <div class="controls">
+        <button id="startBtn">START</button>
+        <button id="restartBtn" class="secondary">RESET</button>
+      </div>
+      <div class="hint">WASD move · Mouse look · Shift run · E interact · F flashlight</div>
+    </div>
+  </div>
+
+  <div id="message">message</div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const screen = document.getElementById('screen');
+    const startBtn = document.getElementById('startBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const messageEl = document.getElementById('message');
+
+    const sanityFill = document.getElementById('sanityFill');
+    const lightFill = document.getElementById('lightFill');
+    const sanityValue = document.getElementById('sanityValue');
+    const lightValue = document.getElementById('lightValue');
+    const statusKeys = document.getElementById('statusKeys');
+    const statusGoal = document.getElementById('statusGoal');
+    const statusWeapon = document.getElementById('statusWeapon');
+
+    const map = [
+      '11111111111111111111',
+      '10000000000001000001',
+      '10111111101101011101',
+      '10000010001000001001',
+      '10101110111011101001',
+      '10001000000000101001',
+      '10111011101110111001',
+      '10000001000000001001',
+      '10111101011110101101',
+      '10000100000000100001',
+      '10110101111110111001',
+      '10010001000000001001',
+      '11110111011101111001',
+      '10000000001000000001',
+      '10111111101111111001',
+      '10000010000000000001',
+      '10111110111111111001',
+      '10000000001000000001',
+      '11111111111111111111'
+    ];
+
+    const tileSize = 1;
+    const player = {
+      x: 1.5,
+      y: 1.5,
+      angle: 0,
+      speed: 2.2,
+      health: 100,
+      flashlight: true,
+      flashlightEnergy: 100,
+      keys: 0,
+      reachedExit: false,
+      canMove: true
+    };
+
+    const enemies = [
+      { x: 5.5, y: 5.5, hp: 100, active: true },
+      { x: 12.5, y: 9.5, hp: 100, active: true },
+      { x: 15.5, y: 14.5, hp: 100, active: true }
+    ];
+
+    const keysPressed = {};
+    let started = false;
+    let lastTime = performance.now();
+    let messageTimer = 0;
+    let exit = { x: 16.5, y: 16.5 };
+    let keyPickup = { x: 9.5, y: 7.5, collected: false };
+    let gameOver = false;
+    let win = false;
+
+    function resize() {
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(window.innerWidth * ratio);
+      canvas.height = Math.floor(window.innerHeight * ratio);
+      ctx.imageSmoothingEnabled = false;
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    function isWall(x, y) {
+      const mx = Math.floor(x);
+      const my = Math.floor(y);
+      if (my < 0 || my >= map.length || mx < 0 || mx >= map[0].length) return true;
+      return map[my][mx] === '1';
+    }
+
+    function setMessage(text, duration = 1400) {
+      messageEl.textContent = text;
+      messageEl.classList.add('visible');
+      messageTimer = duration;
+    }
+
+    function hideMessage() {
+      messageEl.classList.remove('visible');
+    }
+
+    function resetGame() {
+      player.x = 1.5;
+      player.y = 1.5;
+      player.angle = 0;
+      player.health = 100;
+      player.flashlight = true;
+      player.flashlightEnergy = 100;
+      player.keys = 0;
+      player.reachedExit = false;
+      player.canMove = true;
+      keyPickup.collected = false;
+      gameOver = false;
+      win = false;
+      started = true;
+      hideMessage();
+      screen.classList.add('hidden');
+      updateHud();
+    }
+
+    function updateHud() {
+      sanityFill.style.width = `${player.health}%`;
+      lightFill.style.width = `${player.flashlightEnergy}%`;
+      sanityValue.textContent = `${Math.max(0, Math.round(player.health))}%`;
+      lightValue.textContent = `${Math.max(0, Math.round(player.flashlightEnergy))}%`;
+      statusKeys.textContent = `KEYS: ${player.keys}`;
+      statusGoal.textContent = `EXIT: ${player.keys >= 1 ? 'OPEN' : 'CLOSED'}`;
+      statusWeapon.textContent = `FLASHLIGHT: ${player.flashlight ? 'ON' : 'OFF'}`;
+    }
+
+    function castRay(rayAngle) {
+      let dist = 0;
+      while (dist < 18) {
+        const x = player.x + Math.cos(rayAngle) * dist;
+        const y = player.y + Math.sin(rayAngle) * dist;
+        if (isWall(x, y)) return dist;
+        dist += 0.02;
+      }
+      return 18;
+    }
+
+    function drawBackground() {
+      const w = canvas.width;
+      const h = canvas.height;
+      const ceiling = ctx.createLinearGradient(0, 0, 0, h * 0.5);
+      ceiling.addColorStop(0, '#19140d');
+      ceiling.addColorStop(1, '#0d0b09');
+      ctx.fillStyle = ceiling;
+      ctx.fillRect(0, 0, w, h / 2);
+
+      const floor = ctx.createLinearGradient(0, h / 2, 0, h);
+      floor.addColorStop(0, '#1a1a1a');
+      floor.addColorStop(1, '#090909');
+      ctx.fillStyle = floor;
+      ctx.fillRect(0, h / 2, w, h / 2);
+    }
+
+    function drawWalls() {
+      const w = canvas.width;
+      const h = canvas.height;
+      const fov = Math.PI / 3;
+      const numRays = Math.min(260, Math.floor(w / 3));
+      const rayStep = fov / numRays;
+
+      for (let i = 0; i < numRays; i++) {
+        const rayAngle = player.angle - fov / 2 + i * rayStep;
+        const dist = castRay(rayAngle);
+        const corrected = dist * Math.cos(rayAngle - player.angle);
+        const wallHeight = Math.min(h * 1.5, (h / Math.max(0.2, corrected)) * 0.9);
+
+        const x = (i / numRays) * w;
+        const wallX = x;
+        const wallW = Math.max(2, w / numRays + 1);
+
+        const shade = Math.max(0, 255 - corrected * 28);
+        const r = Math.min(255, shade * 0.9);
+        const g = Math.min(255, shade * 0.8);
+        const b = Math.min(255, shade * 0.7);
+
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.fillRect(wallX, h / 2 - wallHeight / 2, wallW, wallHeight);
+      }
+    }
+
+    function projectEntity(x, y, size, color) {
+      const dx = x - player.x;
+      const dy = y - player.y;
+      const distance = Math.hypot(dx, dy);
+      const angleTo = Math.atan2(dy, dx) - player.angle;
+      const inView = Math.abs(angleTo) < Math.PI / 2 + 0.85;
+
+      if (!inView || distance < 0.3) return;
+      const screenX = (canvas.width / 2) + (Math.tan(angleTo) * canvas.width * 0.7) / Math.tan(Math.PI / 6);
+      const screenSize = Math.max(8, (canvas.height / distance) * size);
+      const screenY = canvas.height / 2;
+
+      ctx.fillStyle = color;
+      ctx.fillRect(screenX - screenSize / 2, screenY - screenSize / 2, screenSize, screenSize);
+    }
+
+    function drawKey() {
+      if (!keyPickup.collected) {
+        projectEntity(keyPickup.x, keyPickup.y, 0.8, '#7dd3fc');
+      }
+    }
+
+    function drawExit() {
+      const dx = exit.x - player.x;
+      const dy = exit.y - player.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance < 1.2) {
+        player.reachedExit = true;
+      }
+      projectEntity(exit.x, exit.y, 1.1, '#79f0b1');
+    }
+
+    function drawEnemies() {
+      for (const enemy of enemies) {
+        const dx = player.x - enemy.x;
+        const dy = player.y - enemy.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 0.8) {
+          player.health -= 0.18;
+          if (player.health <= 0) {
+            player.health = 0;
+            gameOver = true;
+          }
+        }
+        if (enemy.active) {
+          projectEntity(enemy.x, enemy.y, 1.15, '#d13c3c');
+        }
+      }
+    }
+
+    function drawMinimap() {
+      const mini = 160;
+      const cell = mini / map[0].length;
+      const offsetX = canvas.width - mini - 16;
+      const offsetY = canvas.height - mini - 16;
+
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(offsetX, offsetY, mini, mini);
+
+      for (let y = 0; y < map.length; y++) {
+        for (let x = 0; x < map[0].length; x++) {
+          const ch = map[y][x];
+          if (ch === '1') {
+            ctx.fillStyle = '#666';
+          } else {
+            ctx.fillStyle = '#211c18';
+          }
+          ctx.fillRect(offsetX + x * cell, offsetY + y * cell, cell - 1, cell - 1);
+        }
+      }
+
+      ctx.fillStyle = '#f0c75f';
+      ctx.fillRect(offsetX + player.x * cell - 3, offsetY + player.y * cell - 3, 6, 6);
+      ctx.fillStyle = '#7dd3fc';
+      ctx.fillRect(offsetX + exit.x * cell - 4, offsetY + exit.y * cell - 4, 8, 8);
+      if (!keyPickup.collected) {
+        ctx.fillStyle = '#7dd3fc';
+        ctx.fillRect(offsetX + keyPickup.x * cell - 3, offsetY + keyPickup.y * cell - 3, 6, 6);
+      }
+    }
+
+    function updatePlayer() {
+      if (!started || gameOver || win) return;
+
+      let moveX = 0;
+      let moveY = 0;
+      if (keysPressed['w']) { moveX += Math.cos(player.angle); moveY += Math.sin(player.angle); }
+      if (keysPressed['s']) { moveX -= Math.cos(player.angle); moveY -= Math.sin(player.angle); }
+      if (keysPressed['a']) { moveX += Math.cos(player.angle - Math.PI / 2); moveY += Math.sin(player.angle - Math.PI / 2); }
+      if (keysPressed['d']) { moveX += Math.cos(player.angle + Math.PI / 2); moveY += Math.sin(player.angle + Math.PI / 2); }
+
+      const len = Math.hypot(moveX, moveY);
+      if (len > 0) {
+        moveX /= len;
+        moveY /= len;
+      }
+
+      const speedBoost = keysPressed['shift'] ? 1.65 : 1;
+      const dx = moveX * player.speed * speedBoost * 0.04;
+      const dy = moveY * player.speed * speedBoost * 0.04;
+
+      if (!isWall(player.x + dx, player.y)) player.x += dx;
+      if (!isWall(player.x, player.y + dy)) player.y += dy;
+
+      if (keysPressed['f']) {
+        if (player.flashlightEnergy > 0) {
+          player.flashlight = !player.flashlight;
+          keysPressed['f'] = false;
+        }
+      }
+
+      if (player.flashlight) {
+        player.flashlightEnergy = Math.max(0, player.flashlightEnergy - 0.06);
+      } else {
+        player.flashlightEnergy = Math.min(100, player.flashlightEnergy + 0.04);
+      }
+
+      if (player.flashlightEnergy <= 0) {
+        player.flashlight = false;
+      }
+
+      if (Math.abs(player.x - keyPickup.x) < 0.8 && Math.abs(player.y - keyPickup.y) < 0.8 && !keyPickup.collected) {
+        keyPickup.collected = true;
+        player.keys += 1;
+        setMessage('Key acquired. Exit unlocked.');
+      }
+
+      if (player.keys >= 1 && Math.abs(player.x - exit.x) < 0.9 && Math.abs(player.y - exit.y) < 0.9) {
+        win = true;
+        setMessage('You escaped the backrooms.');
+        setTimeout(() => {
+          screen.classList.remove('hidden');
+          const panel = screen.querySelector('.panel');
+          panel.innerHTML = `
+            <h1><span class="small">You survived</span>ESCAPED</h1>
+            <p>The hallway lets go. The real world returns, shaky and thin, but alive.</p>
+            <div class="controls">
+              <button id="playAgainBtn">PLAY AGAIN</button>
+            </div>
+          `;
+          document.getElementById('playAgainBtn').addEventListener('click', () => {
+            screen.classList.add('hidden');
+            resetGame();
+          });
+        }, 400);
+      }
+
+      if (player.health <= 0) {
+        gameOver = true;
+        setMessage('You were found.');
+        setTimeout(() => {
+          screen.classList.remove('hidden');
+          const panel = screen.querySelector('.panel');
+          panel.innerHTML = `
+            <h1><span class="small">Signal lost</span>YOU DIED</h1>
+            <p>The walls remember your steps. Try again before the silence finds you.</p>
+            <div class="controls">
+              <button id="retryBtn">TRY AGAIN</button>
+            </div>
+          `;
+          document.getElementById('retryBtn').addEventListener('click', () => {
+            screen.classList.add('hidden');
+            resetGame();
+          });
+        }, 400);
+      }
+
+      updateHud();
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawBackground();
+      drawWalls();
+      drawKey();
+      drawExit();
+      drawEnemies();
+      drawMinimap();
+
+      const glow = ctx.createRadialGradient(
+        canvas.width * 0.5,
+        canvas.height * 0.5,
+        0,
+        canvas.width * 0.5,
+        canvas.height * 0.5,
+        Math.max(canvas.width, canvas.height) * 0.75
+      );
+      glow.addColorStop(0, 'rgba(255,255,255,0.02)');
+      glow.addColorStop(0.4, 'rgba(255,255,255,0.05)');
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (player.flashlight) {
+        ctx.fillStyle = 'rgba(0,0,0,0.48)';
+        const radius = Math.min(canvas.width, canvas.height) * 0.34;
+        const gradient = ctx.createRadialGradient(
+          canvas.width / 2,
+          canvas.height / 2,
+          radius * 0.18,
+          canvas.width / 2,
+          canvas.height / 2,
+          radius
+        );
+        gradient.addColorStop(0, 'rgba(255,255,255,0.0)');
+        gradient.addColorStop(0.4, 'rgba(20,20,20,0.06)');
+        gradient.addColorStop(1, 'rgba(0,0,0,0.82)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.26)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(canvas.width / 2 - 6, canvas.height / 2);
+      ctx.lineTo(canvas.width / 2 + 6, canvas.height / 2);
+      ctx.moveTo(canvas.width / 2, canvas.height / 2 - 6);
+      ctx.lineTo(canvas.width / 2, canvas.height / 2 + 6);
+      ctx.stroke();
+    }
+
+    function tick(now) {
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+
+      if (messageTimer > 0) {
+        messageTimer -= dt * 1000;
+        if (messageTimer <= 0) {
+          hideMessage();
+        }
+      }
+
+      if (started && !gameOver && !win) {
+        updatePlayer();
+      }
+
+      render();
+      requestAnimationFrame(tick);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      if (['w','a','s','d','f','shift'].includes(key)) {
+        keysPressed[key] = true;
+      }
+
+      if (key === 'e') {
+        if (Math.abs(player.x - keyPickup.x) < 0.8 && Math.abs(player.y - keyPickup.y) < 0.8 && !keyPickup.collected) {
+          keyPickup.collected = true;
+          player.keys += 1;
+          setMessage('Key acquired. Exit unlocked.');
+        }
+      }
+
+      if (key === 't') {
+        // debug toggle use if needed
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      const key = e.key.toLowerCase();
+      if (key in keysPressed) keysPressed[key] = false;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!started || gameOver || win) return;
+      const sensitivity = 0.003;
+      player.angle += e.movementX * sensitivity;
+    });
+
+    startBtn.addEventListener('click', () => {
+      resetGame();
+    });
+
+    restartBtn.addEventListener('click', () => {
+      resetGame();
+    });
+
+    updateHud();
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
