@@ -1,641 +1,473 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>THE BACKROOMS</title>
-  <style>
-    :root {
-      --bg: #0a0a0a;
-      --panel: rgba(18, 16, 12, 0.8);
-      --amber: #f0c75f;
-      --amber-2: #d9a32e;
-      --paper: #d9d2ba;
-      --alarm: #ff5f52;
-      --green: #78d78d;
-      --cyan: #7dd3fc;
-    }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>THE BACKROOMS — โนคลิป</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0a07;
+    --amber:#e8c54a;
+    --amber-dim:#8a7527;
+    --damp:#6f6a4a;
+    --alarm:#c4402a;
+    --paper:#cfc9ad;
+    --ui: "IBM Plex Sans Thai", "Noto Sans Thai", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Courier New", monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:#000;color:var(--paper);font-family:var(--ui)}
+  #wrap{position:fixed;inset:0;background:#000}
+  canvas#game{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:none}
 
-    * { box-sizing: border-box; }
+  /* ---------- HUD ---------- */
+  #hud{position:absolute;inset:0;pointer-events:none;font-family:var(--ui)}
+  .corner{position:absolute;padding:14px 16px}
+  #hudTop{top:0;left:0;display:flex;gap:18px;align-items:baseline}
+  #lvlName{font-size:15px;font-weight:600;color:var(--amber);letter-spacing:.02em;
+    text-shadow:0 0 14px rgba(232,197,74,.35)}
+  #lvlSub{font-size:12px;color:#8e886d}
+  #hudBottom{bottom:0;left:0;width:min(320px,42vw)}
+  .meter{margin-top:8px}
+  .meter .lbl{display:flex;justify-content:space-between;font-size:11px;color:#9a9377;
+    font-family:var(--mono);margin-bottom:3px}
+  .bar{height:7px;background:rgba(255,255,255,.07);position:relative;overflow:hidden}
+  .bar i{position:absolute;inset:0 auto 0 0;display:block;transition:width .12s linear}
+  #sanFill{background:linear-gradient(90deg,#3c6f4a,#7fd08c)}
+  #batFill{background:linear-gradient(90deg,#6b5a1c,#e8c54a)}
+  #hudRight{top:0;right:0;text-align:right}
+  #keys{font-family:var(--mono);font-size:13px;color:var(--amber)}
+  #keys span{opacity:.3}
+  #keys span.on{opacity:1;text-shadow:0 0 10px rgba(232,197,74,.6)}
+  #mapCv{position:absolute;right:14px;bottom:14px;width:150px;height:150px;
+    opacity:.55;background:rgba(0,0,0,.45);border:1px solid rgba(232,197,74,.18)}
+  #rescueMapCv{margin:22px auto 0;display:block;background:rgba(0,0,0,.5);
+    border:1px solid rgba(232,197,74,.28)}
+  #chatLog{position:absolute;left:14px;bottom:14px;width:min(320px,48vw);
+    display:flex;flex-direction:column;gap:5px;pointer-events:none}
+  .chatMsg{background:rgba(0,0,0,.5);padding:6px 10px;font-size:13px;line-height:1.4;
+    color:var(--paper);animation:chatFade 7s ease forwards}
+  .chatMsg b{color:var(--amber);font-weight:600;margin-right:6px}
+  .chatMsg.me b{color:#8ed7e0}
+  @keyframes chatFade{0%,75%{opacity:1}100%{opacity:0}}
+  #chatInputBox{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+    width:min(460px,88vw);display:none;z-index:20;pointer-events:auto}
+  #chatInputBox.on{display:block}
+  #chatInputBox input{width:100%;background:rgba(0,0,0,.72);border:1px solid var(--amber);
+    color:var(--paper);font-family:var(--ui);font-size:16px;padding:11px 14px;outline:none}
+  #bChat{bottom:calc(126px + env(safe-area-inset-bottom,0px));
+    right:calc(114px + env(safe-area-inset-right,0px))}
+  #warpFx{position:fixed;inset:0;background:radial-gradient(circle,#e8ffff 0%,#8ee0ea 60%,#2a7a86 100%);opacity:0;pointer-events:none;z-index:30}
+  #toast{position:absolute;left:50%;top:62%;transform:translateX(-50%);
+    font-size:15px;color:var(--paper);background:rgba(0,0,0,.55);padding:8px 16px;
+    opacity:0;transition:opacity .4s;white-space:nowrap}
+  #crosshair{position:absolute;left:50%;top:50%;width:3px;height:3px;margin:-1.5px 0 0 -1.5px;
+    background:rgba(255,255,255,.35);border-radius:50%}
+  #prompt{position:absolute;left:50%;top:56%;transform:translateX(-50%);font-size:14px;
+    color:var(--amber);opacity:0;transition:opacity .15s}
 
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-      color: var(--paper);
-      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
-    }
+  /* ---------- Screens ---------- */
+  .screen{position:absolute;inset:0;display:none;place-items:safe center;overflow-y:auto;
+    background:radial-gradient(ellipse at 50% 40%, #191505 0%, #070603 70%);
+    text-align:center;padding:28px;z-index:10}
+  .screen.on{display:grid}
+  .panel{max-width:620px;width:100%;margin-block:auto}
+  h1{font-size:clamp(34px,7vw,64px);font-weight:700;line-height:.95;color:var(--amber);
+    letter-spacing:-.02em;text-shadow:0 0 40px rgba(232,197,74,.25)}
+  h1 small{display:block;font-family:var(--mono);font-size:12px;font-weight:400;
+    letter-spacing:.42em;color:var(--damp);margin-bottom:14px;text-shadow:none}
+  .lede{margin:18px auto 0;max-width:46ch;font-size:15px;line-height:1.75;color:#a7a084;font-weight:300}
+  .btn{margin-top:26px;pointer-events:auto;display:inline-block;cursor:pointer;
+    font-family:var(--ui);font-size:15px;font-weight:600;color:#14120a;background:var(--amber);
+    border:0;padding:13px 30px;transition:transform .12s, background .12s}
+  .btn:hover{background:#f6d963;transform:translateY(-1px)}
+  .btn:focus-visible{outline:3px solid #fff;outline-offset:3px}
+  .btn.ghost{background:transparent;color:var(--amber);border:1px solid rgba(232,197,74,.4);margin-left:8px}
+  .btn.ghost:hover{background:rgba(232,197,74,.12);color:#f6d963}
+  .keys{margin-top:30px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+    gap:10px 22px;font-size:13px;color:#8e886d;text-align:left;max-width:460px;margin-inline:auto}
+  .keys b{font-family:var(--mono);color:var(--paper);font-weight:600;margin-right:8px}
+  .mpBox{margin-top:26px;padding-top:20px;border-top:1px solid rgba(232,197,74,.16);
+    max-width:420px;margin-inline:auto;pointer-events:auto}
+  .mpTitle{font-size:12px;letter-spacing:.06em;color:#9a9377;margin-bottom:10px}
+  .mpRow{margin-bottom:8px}
+  .mpRow2{display:flex;gap:8px}
+  .mpRow input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(232,197,74,.22);
+    color:var(--paper);font-family:var(--ui);font-size:13px;padding:9px 11px;outline:none}
+  .mpRow input:focus{border-color:var(--amber)}
+  .mpRow input::placeholder{color:#6b664f}
+  .mpHint{margin-top:8px;font-size:11px;color:#75705a}
+  .modeBox{margin-top:22px;padding-top:18px;border-top:1px solid rgba(232,197,74,.14);
+    max-width:360px;margin-inline:auto;pointer-events:auto}
+  .modeBox .mpRow2{justify-content:center}
+  .modeBox .btn.ghost{flex:1;font-size:12px;padding:9px 10px}
+  .modeBox .btn.ghost.active{background:rgba(232,197,74,.18);color:#f6d963;border-color:var(--amber)}
+  .gateForm{max-width:340px;margin:22px auto 0;display:flex;flex-direction:column;gap:10px;pointer-events:auto}
+  .gateForm input{background:rgba(255,255,255,.05);border:1px solid rgba(232,197,74,.25);
+    color:var(--paper);font-family:var(--mono);font-size:14px;letter-spacing:.03em;
+    padding:11px 13px;outline:none;text-align:center}
+  .gateForm input:focus{border-color:var(--amber)}
+  .gateForm input::placeholder{color:#6b664f;font-family:var(--ui)}
+  .gateMsg{min-height:18px;font-size:13px;color:var(--alarm)}
+  .gateRemember{display:flex;align-items:center;gap:8px;font-size:12px;color:#9a9377;
+    justify-content:center;cursor:pointer;user-select:none}
+  .gateRemember input{width:auto;padding:0;accent-color:var(--amber)}
+  .adminToggleWrap{margin-top:30px;padding-top:18px;border-top:1px solid rgba(232,197,74,.14);pointer-events:auto}
+  .adminBox{display:none;max-width:320px;margin:14px auto 0}
+  .adminBox.on{display:block}
+  .adminResult{margin-top:10px;font-family:var(--mono);font-size:16px;color:var(--amber);
+    letter-spacing:.04em;min-height:20px}
+  #introCard h2{font-size:clamp(26px,5vw,42px);color:var(--amber);font-weight:700}
+  #introCard .no{font-family:var(--mono);font-size:12px;letter-spacing:.4em;color:var(--damp)}
+  #introCard p{margin-top:14px;color:#9d9679;font-size:14px;line-height:1.7;font-style:italic;font-weight:300}
+  #deadScr h1{color:var(--alarm);text-shadow:0 0 50px rgba(196,64,42,.4)}
+  #deadScr .lede{color:#9a7f78}
+  #stats{margin-top:20px;font-family:var(--mono);font-size:13px;color:#8e886d;line-height:1.9}
 
-    body { position: relative; }
-
-    canvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-      background: #000;
-      cursor: crosshair;
-    }
-
-    #hud {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 5;
-    }
-
-    .topbar {
-      position: absolute;
-      top: 18px;
-      left: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--amber);
-      font-size: 12px;
-    }
-
-    .topbar strong { font-size: 18px; letter-spacing: 0.02em; }
-
-    .rightbar {
-      position: absolute;
-      top: 18px;
-      right: 20px;
-      text-align: right;
-      font-size: 12px;
-      color: var(--paper);
-      line-height: 1.5;
-    }
-
-    .meter {
-      width: min(280px, 32vw);
-      position: absolute;
-      left: 18px;
-      bottom: 18px;
-    }
-
-    .meter-row { margin-top: 10px; }
-
-    .label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      font-family: ui-monospace, monospace;
-      color: #beb69a;
-      margin-bottom: 4px;
-    }
-
-    .bar {
-      height: 8px;
-      background: rgba(255,255,255,0.08);
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .fill { height: 100%; width: 100%; transition: width 0.12s linear; }
-    .health { background: linear-gradient(90deg, #3c6d4b, #7ecf8a); }
-    .light { background: linear-gradient(90deg, #6a5418, #f0c75f); }
-
-    #screen {
-      position: fixed;
-      inset: 0;
-      z-index: 10;
-      display: grid;
-      place-items: center;
-      background: radial-gradient(circle at center, rgba(24,18,12,0.8), rgba(5,5,5,0.96));
-      transition: opacity 0.2s ease;
-    }
-
-    #screen.hidden { opacity: 0; pointer-events: none; }
-
-    .panel {
-      width: min(700px, 90vw);
-      padding: 28px 28px 22px;
-      background: rgba(15, 13, 10, 0.82);
-      border: 1px solid rgba(240, 199, 95, 0.25);
-      box-shadow: 0 0 35px rgba(240, 199, 95, 0.1);
-      text-align: center;
-    }
-
-    h1 {
-      margin: 0;
-      color: var(--amber);
-      font-size: clamp(32px, 6vw, 64px);
-      line-height: 0.95;
-      letter-spacing: -0.04em;
-      text-transform: uppercase;
-    }
-
-    .small {
-      display: block;
-      font-size: 11px;
-      letter-spacing: 0.45em;
-      color: #8a815d;
-      margin-bottom: 12px;
-      text-transform: uppercase;
-    }
-
-    p {
-      margin: 18px auto 0;
-      max-width: 58ch;
-      color: #c1b89a;
-      line-height: 1.7;
-      font-size: 15px;
-    }
-
-    .controls {
-      margin-top: 22px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      justify-content: center;
-    }
-
-    button {
-      appearance: none;
-      border: 1px solid rgba(240, 199, 95, 0.7);
-      background: var(--amber);
-      color: #140f07;
-      font-weight: 700;
-      padding: 12px 22px;
-      border-radius: 0;
-      cursor: pointer;
-      transition: transform 0.12s ease, filter 0.12s ease;
-    }
-
-    button:hover { transform: translateY(-1px); filter: brightness(1.05); }
-    button.secondary { background: transparent; color: var(--amber); }
-
-    .hint {
-      margin-top: 18px;
-      font-size: 12px;
-      opacity: 0.8;
-      color: #a59671;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-
-    #message {
-      position: fixed;
-      left: 50%;
-      top: 62%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.56);
-      border: 1px solid rgba(255,255,255,0.12);
-      color: var(--paper);
-      padding: 8px 14px;
-      font-size: 14px;
-      opacity: 0;
-      pointer-events: none;
-      z-index: 11;
-      transition: opacity 0.18s ease;
-    }
-
-    #message.visible { opacity: 1; }
-  </style>
+  /* ---------- touch (โหมดมือถือ) ---------- */
+  #touch{position:absolute;inset:0;display:none;z-index:5}
+  #touch.on{display:block}
+  #stick{position:absolute;width:132px;height:132px;border-radius:50%;
+    border:1px solid rgba(232,197,74,.28);background:rgba(0,0,0,.32);
+    opacity:0;transition:opacity .1s;pointer-events:none}
+  #nub{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;
+    border-radius:50%;background:rgba(232,197,74,.32)}
+  .tbtn{position:absolute;right:calc(20px + env(safe-area-inset-right,0px));width:76px;height:76px;
+    border-radius:50%;border:1px solid rgba(232,197,74,.32);background:rgba(0,0,0,.36);color:var(--amber);
+    font-family:var(--ui);font-size:14px;font-weight:600;display:grid;place-items:center;
+    -webkit-tap-highlight-color:transparent;user-select:none}
+  #bRun{bottom:calc(126px + env(safe-area-inset-bottom,0px))}
+  #bLight{bottom:calc(30px + env(safe-area-inset-bottom,0px));right:calc(206px + env(safe-area-inset-right,0px))}
+  #bUse{bottom:calc(30px + env(safe-area-inset-bottom,0px));right:calc(114px + env(safe-area-inset-right,0px))}
+  #bFire{bottom:calc(30px + env(safe-area-inset-bottom,0px));right:calc(20px + env(safe-area-inset-right,0px))}
+  /* บนมือถือ ย้ายมินิแมพขึ้นไปมุมบนแทน กันไม่ให้ทับกลุ่มปุ่มควบคุมที่มุมล่างขวา */
+  html.touchMode #mapCv{top:calc(14px + env(safe-area-inset-top,0px));bottom:auto;
+    right:calc(14px + env(safe-area-inset-right,0px))}
+  @media (prefers-reduced-motion: reduce){ .btn{transition:none} }
+  /* กัน Safari/Chrome บนมือถือซูมจออัตโนมัติตอนแตะกรอกข้อความ (ต้องมี font-size >=16px) */
+  html.touchMode .gateForm input, html.touchMode .mpRow input, html.touchMode .adminBox input{font-size:16px}
+</style>
 </head>
 <body>
+<div id="wrap">
   <canvas id="game"></canvas>
 
+  <div id="warpFx"></div>
   <div id="hud">
-    <div class="topbar">
-      <span>LEVEL 01</span>
-      <strong id="levelName">Lobby</strong>
-    </div>
-
-    <div class="rightbar">
-      <div id="statusKeys">KEYS: 0</div>
-      <div id="statusGoal">EXIT: CLOSED</div>
-      <div id="statusWeapon">FLASHLIGHT: ON</div>
-    </div>
-
-    <div class="meter">
-      <div class="meter-row">
-        <div class="label"><span>Sanity</span><span id="sanityValue">100%</span></div>
-        <div class="bar"><div id="sanityFill" class="fill health"></div></div>
-      </div>
-      <div class="meter-row">
-        <div class="label"><span>Light</span><span id="lightValue">100%</span></div>
-        <div class="bar"><div id="lightFill" class="fill light"></div></div>
+    <div class="corner" id="hudTop">
+      <div>
+        <div id="lvlName">ล็อบบี้</div>
+        <div id="lvlSub">ระดับ 0</div>
       </div>
     </div>
+    <div class="corner" id="hudRight">
+      <div id="keys"></div>
+      <div id="mpStatus" style="font-family:var(--mono);font-size:11px;color:#7fbf8f;margin-top:6px"></div>
+      <div id="gunStatus" style="font-family:var(--mono);font-size:12px;color:var(--amber);margin-top:6px"></div>
+      <div id="suitStatus" style="font-family:var(--mono);font-size:12px;color:#8ed7e0;margin-top:4px"></div>
+    </div>
+    <div class="corner" id="hudBottom">
+      <div class="meter">
+        <div class="lbl"><span>สติ</span><span id="sanTxt">100%</span></div>
+        <div class="bar"><i id="sanFill" style="width:100%"></i></div>
+      </div>
+      <div class="meter" id="batMeter">
+        <div class="lbl"><span>ไฟฉาย</span><span id="batTxt">100%</span></div>
+        <div class="bar"><i id="batFill" style="width:100%"></i></div>
+      </div>
+    </div>
+    <div id="crosshair"></div>
+    <div id="prompt"></div>
+    <div id="toast"></div>
+    <canvas id="mapCv" width="150" height="150"></canvas>
+    <div id="chatLog"></div>
   </div>
 
-  <div id="screen">
-    <div class="panel">
-      <h1><span class="small">No Clip Detected</span>THE BACKROOMS</h1>
-      <p>
-        You wake in a place that should not exist. The carpet is damp, the ceiling hums,
-        and every corridor looks like it was copied from a memory no one remembers making.
-        Find the exit. Keep your sanity. Do not let the things in the walls notice you.
-      </p>
-      <div class="controls">
-        <button id="startBtn">START</button>
-        <button id="restartBtn" class="secondary">RESET</button>
-      </div>
-      <div class="hint">WASD move · Mouse look · Shift run · E interact · F flashlight</div>
-    </div>
+  <div id="chatInputBox">
+    <input id="chatInput" placeholder="พิมพ์ข้อความ... (Enter ส่ง, Esc ยกเลิก)" maxlength="140">
   </div>
 
-  <div id="message">message</div>
+  <div id="touch">
+    <div id="stick"><div id="nub"></div></div>
+    <div class="tbtn" id="bRun">วิ่ง</div>
+    <div class="tbtn" id="bLight">ไฟ</div>
+    <div class="tbtn" id="bUse">ใช้</div>
+    <div class="tbtn" id="bFire">ยิง</div>
+    <div class="tbtn" id="bChat" style="font-size:20px">💬</div>
+  </div>
 
-  <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const screen = document.getElementById('screen');
-    const startBtn = document.getElementById('startBtn');
-    const restartBtn = document.getElementById('restartBtn');
-    const messageEl = document.getElementById('message');
+  <!-- gate: ต้องกรอกชื่อ+รหัสก่อนถึงจะเข้าเกมได้ -->
+  <div class="screen on" id="gateScr"><div class="panel">
+    <h1><small>ระบบยืนยันสิทธิ์</small>กรอกรหัสเข้าเกม</h1>
+    <p class="lede">กรอกชื่อผู้เล่นและรหัสที่ได้รับจากผู้ขาย ให้ตรงกันเป๊ะ ๆ (ตัวพิมพ์เล็ก-ใหญ่ไม่มีผล)</p>
+    <div class="gateForm">
+      <input id="gateName" placeholder="ชื่อผู้เล่น">
+      <input id="gateCode" placeholder="รหัสเกม เช่น A1B2-C3D4">
+      <label class="gateRemember"><input type="checkbox" id="gateRemember" checked> จำเครื่องนี้ไว้ (ครั้งต่อไปไม่ต้องกรอกซ้ำ)</label>
+      <button class="btn" id="btnUnlock">ปลดล็อกเกม</button>
+      <div id="gateMsg" class="gateMsg"></div>
+    </div>
+    <div class="adminToggleWrap">
+      <button class="btn ghost" id="btnAdminToggle">สำหรับผู้สร้าง</button>
+      <div id="adminBox" class="adminBox">
+        <div class="mpRow"><input id="adminPass" type="password" placeholder="รหัสผู้สร้าง"></div>
+        <div class="mpRow"><input id="adminName" placeholder="ชื่อผู้เล่นที่จะออกรหัสให้"></div>
+        <button class="btn ghost" id="btnGenCode">สร้างรหัสให้ผู้เล่นนี้</button>
+        <div id="adminResult" class="adminResult"></div>
+      </div>
+    </div>
+  </div></div>
 
-    const sanityFill = document.getElementById('sanityFill');
-    const lightFill = document.getElementById('lightFill');
-    const sanityValue = document.getElementById('sanityValue');
-    const lightValue = document.getElementById('lightValue');
-    const statusKeys = document.getElementById('statusKeys');
-    const statusGoal = document.getElementById('statusGoal');
-    const statusWeapon = document.getElementById('statusWeapon');
+  <!-- title -->
+  <div class="screen" id="titleScr"><div class="panel">
+    <h1><small>no&nbsp;clip&nbsp;detected</small>เดอะ แบ็คลูมส์</h1>
+    <p class="lede">คุณหลุดออกจากความเป็นจริงมาผิดที่ กลิ่นพรมเปียก เสียงหึ่งของหลอดไฟ
+      และทางเดินสีเหลืองที่ไม่มีวันจบ หาทางออกของแต่ละชั้นให้เจอ ก่อนที่สติจะหมด
+      — และก่อนที่สิ่งอื่นจะหาคุณเจอ</p>
+    <button class="btn" id="btnStart">เริ่มไต่ระดับ (คนเดียว)</button>
+    <div class="modeBox">
+      <div class="mpTitle">โหมดควบคุม</div>
+      <div class="mpRow mpRow2">
+        <button class="btn ghost" id="btnModeDesktop">💻 คอมพิวเตอร์</button>
+        <button class="btn ghost" id="btnModeTouch">📱 มือถือ/แท็บเล็ต</button>
+      </div>
+      <div id="modeNote" class="mpHint"></div>
+    </div>
+    <div class="keys">
+      <div><b>W A S D</b>เดิน</div>
+      <div><b>เมาส์</b>มองรอบตัว</div>
+      <div><b>Shift</b>วิ่ง</div>
+      <div><b>F</b>เปิด/ปิดไฟฉาย</div>
+      <div><b>E</b>หยิบของ / ใช้ประตู</div>
+      <div><b>Esc</b>พัก</div>
+    </div>
+    <div class="mpBox">
+      <div class="mpTitle">เล่นด้วยกันหลายคน (ต้องมีเซิร์ฟเวอร์)</div>
+      <div class="mpRow"><input id="mpUrl" placeholder="ws://ที่อยู่เซิร์ฟเวอร์:8080"></div>
+      <div class="mpRow mpRow2">
+        <input id="mpRoom" placeholder="รหัสห้อง เช่น main">
+        <input id="mpName" placeholder="ชื่อของคุณ">
+      </div>
+      <button class="btn ghost" id="btnMpStart">เชื่อมต่อ &amp; เข้าเล่นด้วยกัน</button>
+      <div class="mpHint">ต้องรัน server.js ของตัวเองก่อน แล้วใส่ที่อยู่เซิร์ฟเวอร์ตรงนี้</div>
+    </div>
+    <button class="btn ghost" id="btnForget" style="margin-top:16px;font-size:11px;padding:6px 14px">ล้างข้อมูลที่จำไว้ในเครื่องนี้</button>
+  </div></div>
 
-    const map = [
-      '11111111111111111111',
-      '10000000000001000001',
-      '10111111101101011101',
-      '10000010001000001001',
-      '10101110111011101001',
-      '10001000000000101001',
-      '10111011101110111001',
-      '10000001000000001001',
-      '10111101011110101101',
-      '10000100000000100001',
-      '10110101111110111001',
-      '10010001000000001001',
-      '11110111011101111001',
-      '10000000001000000001',
-      '10111111101111111001',
-      '10000010000000000001',
-      '10111110111111111001',
-      '10000000001000000001',
-      '11111111111111111111'
-    ];
+  <!-- level intro -->
+  <div class="screen" id="introCard"><div class="panel">
+    <div class="no" id="icNo">LEVEL 0</div>
+    <h2 id="icName">ล็อบบี้</h2>
+    <p id="icDesc"></p>
+    <button class="btn" id="btnGo">เข้าไป</button>
+  </div></div>
 
-    const tileSize = 1;
-    const player = {
-      x: 1.5,
-      y: 1.5,
-      angle: 0,
-      speed: 2.2,
-      health: 100,
-      flashlight: true,
-      flashlightEnergy: 100,
-      keys: 0,
-      reachedExit: false,
-      canMove: true
-    };
+  <!-- pause -->
+  <div class="screen" id="pauseScr"><div class="panel">
+    <h1><small>หยุดชั่วคราว</small>ยืนนิ่งไว้</h1>
+    <p class="lede">ไม่มีอะไรขยับเมื่อคุณไม่ขยับ อย่างน้อยก็ตามทฤษฎี</p>
+    <button class="btn" id="btnResume">ไปต่อ</button>
+    <button class="btn ghost" id="btnQuit">ออกไปหน้าแรก</button>
+  </div></div>
 
-    const enemies = [
-      { x: 5.5, y: 5.5, hp: 100, active: true },
-      { x: 12.5, y: 9.5, hp: 100, active: true },
-      { x: 15.5, y: 14.5, hp: 100, active: true }
-    ];
+  <!-- dead -->
+  <div class="screen" id="deadScr"><div class="panel">
+    <h1><small>สัญญาณขาดหาย</small>คุณถูกพบแล้ว</h1>
+    <div id="deadKiller" style="font-family:var(--mono);font-size:15px;color:#ff8a7a;letter-spacing:.06em;margin:0 0 10px"></div>
+    <p class="lede" id="deadWhy">สติของคุณหมดลงกลางทางเดินที่ไม่ม���ชื่อ</p>
+    <div id="stats"></div>
+    <button class="btn" id="btnRetry">ลองชั้นนี้ใหม่</button>
+    <button class="btn ghost" id="btnWaitMeg">รอหน่วย M.E.G. มาช่วย</button>
+    <button class="btn ghost" id="btnQuit2">หน้าแรก</button>
+  </div></div>
 
-    const keysPressed = {};
-    let started = false;
-    let lastTime = performance.now();
-    let messageTimer = 0;
-    let exit = { x: 16.5, y: 16.5 };
-    let keyPickup = { x: 9.5, y: 7.5, collected: false };
-    let gameOver = false;
-    let win = false;
+  <!-- rescue: รอหน่วย M.E.G. -->
+  <div class="screen" id="rescueScr"><div class="panel">
+    <h1><small>ขอความช่วยเหลือ</small>ส่งสัญญาณไปแล้ว</h1>
+    <p class="lede" id="rescueMsg">หน่วย M.E.G. กำลังเดินทางมาหาคุณ อยู่นิ่ง ๆ ไว้ก่อน...</p>
+    <canvas id="rescueMapCv" width="260" height="260"></canvas>
+    <p class="lede" id="rescueCountdown" style="margin-top:14px;font-size:13px"></p>
+    <button class="btn ghost" id="btnCancelRescue">ยกเลิก กลับไปหน้าตาย</button>
+  </div></div>
 
-    function resize() {
-      const ratio = window.devicePixelRatio || 1;
-      canvas.width = Math.floor(window.innerWidth * ratio);
-      canvas.height = Math.floor(window.innerHeight * ratio);
-      ctx.imageSmoothingEnabled = false;
+  <!-- win -->
+  <div class="screen" id="winScr"><div class="panel">
+    <h1><small>ทางออกจริง</small>คุณออกมาได้</h1>
+    <p class="lede">ประตูบานสุดท้ายเปิดออกสู่ลานจอดรถตอนบ่ายสามโมง
+      แสงแดดจริง ลมจริง เสียงรถจริง ไม่มีเสียงหึ่ง</p>
+    <div id="winStats"></div>
+    <button class="btn" id="btnAgain">ลงไปใหม่อีกรอบ</button>
+  </div></div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   THE BACKROOMS — raycasting engine, ไฟล์เดียวจบ
+   ============================================================ */
+
+/* ---------- utils ---------- */
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const lerp=(a,b,t)=>a+(b-a)*t;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ---------- ระบบรหัสเข้าเกม ----------
+   ข้อควรทราบ: นี่คือ "ด่านกันเผลอ" ไม่ใช่การป้องกันระดับความปลอดภัยสูง
+   เพราะไฟล์นี้รันในเบราว์เซอร์ล้วน ใครกด Ctrl+U/F12 ดูซอร์สจะเห็นสูตรนี้ได้
+   เหมาะกับการขายให้เพื่อนแบบไว้ใจกัน ไม่เหมาะกับป้องกันการละเมิดลิขสิทธิ์จริงจัง */
+const LICENSE_SALT="backrooms-v1-2026";     // เปลี่ยนค่านี้เพื่อออกรหัสชุดใหม่ทั้งหมด (รหัสเก่าทั้งหมดจะใช้ไม่ได้อีก)
+const ADMIN_PASSWORD="676767";              // รหัสสำหรับผู้สร้าง ใช้ตอนออกรหัสให้ผู้เล่นแต่ละคน
+function codeForName(name){
+  const input=LICENSE_SALT+"::"+name.trim().toLowerCase();
+  let h1=0x811c9dc5,h2=0x9e3779b9;
+  for(let i=0;i<input.length;i++){
+    const c=input.charCodeAt(i);
+    h1=Math.imul(h1^c,16777619);
+    h2=Math.imul(h2^c,2246822519);h2=h2^(h2>>>13);
+  }
+  const big=(BigInt(h1>>>0)<<32n)|BigInt(h2>>>0);
+  let code=big.toString(36).toUpperCase().replace(/[^A-Z0-9]/g,"X");
+  while(code.length<8)code+="0";
+  code=code.slice(-8);
+  return code.slice(0,4)+"-"+code.slice(4,8);
+}
+// จำสถานะปลดล็อกไว้ในเครื่องนี้เท่านั้น (ไม่ได้เชื่อมกับที่ไหน แค่กันไม่ต้องพิมพ์รหัสซ้ำทุกครั้ง)
+function lsGet(key){try{return localStorage.getItem(key);}catch(e){return null;}}
+function lsSet(key,val){try{localStorage.setItem(key,val);return true;}catch(e){return false;}}
+function lsDel(key){try{localStorage.removeItem(key);}catch(e){}}
+let rnd=mulberry32(1);
+const $=id=>document.getElementById(id);
+
+/* ---------- textures ---------- */
+function T(w,h){return{w,h,d:new Uint8ClampedArray(w*h*3)};}
+function setPx(t,x,y,r,g,b){const i=(y*t.w+x)*3;t.d[i]=r;t.d[i+1]=g;t.d[i+2]=b;}
+function hex(c){return[parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)];}
+
+// fractal-ish value noise on a 64 grid
+function noiseField(size,seed,oct){
+  const r=mulberry32(seed);const out=new Float32Array(size*size);
+  for(let o=0;o<oct;o++){
+    const step=Math.max(1,size>>(o+1));const amp=1/(o+1.4);
+    const g=[];const gs=Math.ceil(size/step)+1;
+    for(let i=0;i<gs*gs;i++)g.push(r());
+    for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+      const gx=x/step,gy=y/step,x0=Math.floor(gx),y0=Math.floor(gy);
+      const fx=gx-x0,fy=gy-y0;
+      const a=g[y0*gs+x0],b=g[y0*gs+x0+1],c=g[(y0+1)*gs+x0],d=g[(y0+1)*gs+x0+1];
+      const sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy);
+      out[y*size+x]+=amp*lerp(lerp(a,b,sx),lerp(c,d,sx),sy);
     }
+  }
+  let mx=0;for(let i=0;i<out.length;i++)if(out[i]>mx)mx=out[i];
+  for(let i=0;i<out.length;i++)out[i]/=mx;
+  return out;
+}
 
-    window.addEventListener('resize', resize);
-    resize();
-
-    function isWall(x, y) {
-      const mx = Math.floor(x);
-      const my = Math.floor(y);
-      if (my < 0 || my >= map.length || mx < 0 || mx >= map[0].length) return true;
-      return map[my][mx] === '1';
-    }
-
-    function setMessage(text, duration = 1400) {
-      messageEl.textContent = text;
-      messageEl.classList.add('visible');
-      messageTimer = duration;
-    }
-
-    function hideMessage() {
-      messageEl.classList.remove('visible');
-    }
-
-    function resetGame() {
-      player.x = 1.5;
-      player.y = 1.5;
-      player.angle = 0;
-      player.health = 100;
-      player.flashlight = true;
-      player.flashlightEnergy = 100;
-      player.keys = 0;
-      player.reachedExit = false;
-      player.canMove = true;
-      keyPickup.collected = false;
-      gameOver = false;
-      win = false;
-      started = true;
-      hideMessage();
-      screen.classList.add('hidden');
-      updateHud();
-    }
-
-    function updateHud() {
-      sanityFill.style.width = `${player.health}%`;
-      lightFill.style.width = `${player.flashlightEnergy}%`;
-      sanityValue.textContent = `${Math.max(0, Math.round(player.health))}%`;
-      lightValue.textContent = `${Math.max(0, Math.round(player.flashlightEnergy))}%`;
-      statusKeys.textContent = `KEYS: ${player.keys}`;
-      statusGoal.textContent = `EXIT: ${player.keys >= 1 ? 'OPEN' : 'CLOSED'}`;
-      statusWeapon.textContent = `FLASHLIGHT: ${player.flashlight ? 'ON' : 'OFF'}`;
-    }
-
-    function castRay(rayAngle) {
-      let dist = 0;
-      while (dist < 18) {
-        const x = player.x + Math.cos(rayAngle) * dist;
-        const y = player.y + Math.sin(rayAngle) * dist;
-        if (isWall(x, y)) return dist;
-        dist += 0.02;
-      }
-      return 18;
-    }
-
-    function drawBackground() {
-      const w = canvas.width;
-      const h = canvas.height;
-      const ceiling = ctx.createLinearGradient(0, 0, 0, h * 0.5);
-      ceiling.addColorStop(0, '#19140d');
-      ceiling.addColorStop(1, '#0d0b09');
-      ctx.fillStyle = ceiling;
-      ctx.fillRect(0, 0, w, h / 2);
-
-      const floor = ctx.createLinearGradient(0, h / 2, 0, h);
-      floor.addColorStop(0, '#1a1a1a');
-      floor.addColorStop(1, '#090909');
-      ctx.fillStyle = floor;
-      ctx.fillRect(0, h / 2, w, h / 2);
-    }
-
-    function drawWalls() {
-      const w = canvas.width;
-      const h = canvas.height;
-      const fov = Math.PI / 3;
-      const numRays = Math.min(260, Math.floor(w / 3));
-      const rayStep = fov / numRays;
-
-      for (let i = 0; i < numRays; i++) {
-        const rayAngle = player.angle - fov / 2 + i * rayStep;
-        const dist = castRay(rayAngle);
-        const corrected = dist * Math.cos(rayAngle - player.angle);
-        const wallHeight = Math.min(h * 1.5, (h / Math.max(0.2, corrected)) * 0.9);
-
-        const x = (i / numRays) * w;
-        const wallX = x;
-        const wallW = Math.max(2, w / numRays + 1);
-        const shade = Math.max(0, 255 - corrected * 28);
-        const r = Math.min(255, shade * 0.9);
-        const g = Math.min(255, shade * 0.8);
-        const b = Math.min(255, shade * 0.7);
-
-        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-        ctx.fillRect(wallX, h / 2 - wallHeight / 2, wallW, wallHeight);
-      }
-    }
-
-    function projectEntity(x, y, size, color) {
-      const dx = x - player.x;
-      const dy = y - player.y;
-      const distance = Math.hypot(dx, dy);
-      const angleTo = Math.atan2(dy, dx) - player.angle;
-      const inView = Math.abs(angleTo) < Math.PI / 2 + 0.85;
-      if (!inView || distance < 0.3) return;
-      const screenX = (canvas.width / 2) + (Math.tan(angleTo) * canvas.width * 0.7) / Math.tan(Math.PI / 6);
-      const screenSize = Math.max(8, (canvas.height / distance) * size);
-      const screenY = canvas.height / 2;
-      ctx.fillStyle = color;
-      ctx.fillRect(screenX - screenSize / 2, screenY - screenSize / 2, screenSize, screenSize);
-    }
-
-    function drawKey() {
-      if (!keyPickup.collected) projectEntity(keyPickup.x, keyPickup.y, 0.8, '#7dd3fc');
-    }
-
-    function drawExit() {
-      const dx = exit.x - player.x;
-      const dy = exit.y - player.y;
-      const distance = Math.hypot(dx, dy);
-      if (distance < 1.2) player.reachedExit = true;
-      projectEntity(exit.x, exit.y, 1.1, '#79f0b1');
-    }
-
-    function drawEnemies() {
-      for (const enemy of enemies) {
-        const dx = player.x - enemy.x;
-        const dy = player.y - enemy.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < 0.8) {
-          player.health -= 0.18;
-          if (player.health <= 0) {
-            player.health = 0;
-            gameOver = true;
-          }
-        }
-        if (enemy.active) projectEntity(enemy.x, enemy.y, 1.15, '#d13c3c');
-      }
-    }
-
-    function drawMinimap() {
-      const mini = 160;
-      const cell = mini / map[0].length;
-      const offsetX = canvas.width - mini - 16;
-      const offsetY = canvas.height - mini - 16;
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      ctx.fillRect(offsetX, offsetY, mini, mini);
-
-      for (let y = 0; y < map.length; y++) {
-        for (let x = 0; x < map[0].length; x++) {
-          ctx.fillStyle = map[y][x] === '1' ? '#666' : '#211c18';
-          ctx.fillRect(offsetX + x * cell, offsetY + y * cell, cell - 1, cell - 1);
-        }
-      }
-
-      ctx.fillStyle = '#f0c75f';
-      ctx.fillRect(offsetX + player.x * cell - 3, offsetY + player.y * cell - 3, 6, 6);
-      ctx.fillStyle = '#7dd3fc';
-      ctx.fillRect(offsetX + exit.x * cell - 4, offsetY + exit.y * cell - 4, 8, 8);
-      if (!keyPickup.collected) {
-        ctx.fillStyle = '#7dd3fc';
-        ctx.fillRect(offsetX + keyPickup.x * cell - 3, offsetY + keyPickup.y * cell - 3, 6, 6);
+/* wall texture builder. style: wallpaper | concrete | tile | pipe | wood | rock | fence | metal */
+function makeWall(style,c1,c2,seed){
+  const S=64,t=T(S,S),n=noiseField(S,seed,4),[r1,g1,b1]=hex(c1),[r2,g2,b2]=hex(c2);
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+    let f=0,r,g,b;
+    const nz=n[y*S+x];
+    switch(style){
+      case "wallpaper":{                       // ลายทางแนวตั้ง + คราบชื้นด้านล่าง
+        const stripe=(x%8<4)?0:1;
+        f=stripe*0.5+nz*0.28;
+        const damp=clamp((y-40)/24,0,1)*0.55*(0.5+nz);
+        r=lerp(r1,r2,f)*(1-damp*0.45);g=lerp(g1,g2,f)*(1-damp*0.5);b=lerp(b1,b2,f)*(1-damp*0.3);
+        if(y%32===31){r*=.6;g*=.6;b*=.6;}      // รอยต่อกระดาษ
+        break;}
+      case "concrete":{
+        f=nz*0.85+((x*7+y*13)%17)/60;
+        r=lerp(r1,r2,f);g=lerp(g1,g2,f);b=lerp(b1,b2,f);
+        if((x+y*3)%61===0){r*=.72;g*=.72;b*=.72;}
+        break;}
+      case "tile":{
+        const gx=x%16,gy=y%16;const grout=(gx<2||gy<2)?1:0;
+        f=nz*0.3;
+        r=lerp(r1,r2,f);g=lerp(g1,g2,f);b=lerp(b1,b2,f);
+        if(grout){r*=.55;g*=.55;b*=.58;}
+        else{const sh=1-(gx+gy)/70;r*=sh;g*=sh;b*=sh;}
+        break;}
+      case "pipe":{
+        const band=Math.abs(Math.sin((x+nz*6)*0.49));
+        f=band*0.9;
+        r=lerp(r1,r2,f);g=lerp(g1,g2,f);b=lerp(b1,b2,f);
+        if(y%21<2){r*=.5;g*=.5;b*=.5;}
+        const rust=nz>0.72?(nz-0.72)*3:0;
+        r=lerp(r,140,rust);g=lerp(g,70,rust);b=lerp(b,34,rust);
+        break;}
+      case "wood":{
+        const grain=Math.sin(y*0.55+nz*7)*0.5+0.5;
+        f=grain*0.7+nz*0.25;
+        r=lerp(r1,r2,f);g=lerp(g1,g2,f);b=lerp(b1,b2,f);
+        if(x%21===0){r*=.55;g*=.55;b*=.55;}
+        break;}
+      case "rock":{
+        f=nz*nz*1.1;
+        r=lerp(r1,r2,f);g=lerp(g1,g2,f);b=lerp(b1,b2,f);
+        break;}
+      case "fence":{
+        const plank=(x%11<9)?1:0;
+        f=nz*0.5+(x%11)/22;
+        r=lerp(r1,r2,f)*(plank?1:.45);g=lerp(g1,g2,f)*(plank?1:.45);b=lerp(b1,b2,f)*(plank?1:.45);
+        break;}
+      default:{ // metal
+        const rib=(x%12<1||y%24<1)?0.2:1;
+        f=nz*0.5;
+        r=lerp(r1,r2,f)*rib;g=lerp(g1,g2,f)*rib;b=lerp(b1,b2,f)*rib;
       }
     }
+    setPx(t,x,y,r,g,b);
+  }
+  return t;
+}
 
-    function updatePlayer() {
-      if (!started || gameOver || win) return;
-
-      let moveX = 0;
-      let moveY = 0;
-      if (keysPressed['w']) { moveX += Math.cos(player.angle); moveY += Math.sin(player.angle); }
-      if (keysPressed['s']) { moveX -= Math.cos(player.angle); moveY -= Math.sin(player.angle); }
-      if (keysPressed['a']) { moveX += Math.cos(player.angle - Math.PI / 2); moveY += Math.sin(player.angle - Math.PI / 2); }
-      if (keysPressed['d']) { moveX += Math.cos(player.angle + Math.PI / 2); moveY += Math.sin(player.angle + Math.PI / 2); }
-
-      const len = Math.hypot(moveX, moveY);
-      if (len > 0) { moveX /= len; moveY /= len; }
-
-      const speedBoost = keysPressed['shift'] ? 1.65 : 1;
-      const dx = moveX * player.speed * speedBoost * 0.04;
-      const dy = moveY * player.speed * speedBoost * 0.04;
-      if (!isWall(player.x + dx, player.y)) player.x += dx;
-      if (!isWall(player.x, player.y + dy)) player.y += dy;
-
-      if (keysPressed['f'] && player.flashlightEnergy > 0) {
-        player.flashlight = !player.flashlight;
-        keysPressed['f'] = false;
-      }
-      if (player.flashlight) player.flashlightEnergy = Math.max(0, player.flashlightEnergy - 0.06);
-      else player.flashlightEnergy = Math.min(100, player.flashlightEnergy + 0.04);
-      if (player.flashlightEnergy <= 0) player.flashlight = false;
-
-      if (Math.abs(player.x - keyPickup.x) < 0.8 && Math.abs(player.y - keyPickup.y) < 0.8 && !keyPickup.collected) {
-        keyPickup.collected = true;
-        player.keys += 1;
-        setMessage('Key acquired. Exit unlocked.');
-      }
-
-      if (player.keys >= 1 && Math.abs(player.x - exit.x) < 0.9 && Math.abs(player.y - exit.y) < 0.9) {
-        win = true;
-        setMessage('You escaped the backrooms.');
-        setTimeout(() => {
-          screen.classList.remove('hidden');
-          const panel = screen.querySelector('.panel');
-          panel.innerHTML = `
-            <h1><span class="small">You survived</span>ESCAPED</h1>
-            <p>The hallway lets go. The real world returns, shaky and thin, but alive.</p>
-            <div class="controls"><button id="playAgainBtn">PLAY AGAIN</button></div>
-          `;
-          document.getElementById('playAgainBtn').addEventListener('click', () => {
-            screen.classList.add('hidden');
-            resetGame();
-          });
-        }, 400);
-      }
-
-      if (player.health <= 0) {
-        gameOver = true;
-        setMessage('You were found.');
-        setTimeout(() => {
-          screen.classList.remove('hidden');
-          const panel = screen.querySelector('.panel');
-          panel.innerHTML = `
-            <h1><span class="small">Signal lost</span>YOU DIED</h1>
-            <p>The walls remember your steps. Try again before the silence finds you.</p>
-            <div class="controls"><button id="retryBtn">TRY AGAIN</button></div>
-          `;
-          document.getElementById('retryBtn').addEventListener('click', () => {
-            screen.classList.add('hidden');
-            resetGame();
-          });
-        }, 400);
-      }
-      updateHud();
+function makeFloor(style,c1,c2,seed){
+  const S=64,t=T(S,S),n=noiseField(S,seed,4),[r1,g1,b1]=hex(c1),[r2,g2,b2]=hex(c2);
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+    const nz=n[y*S+x];let f=nz,r,g,b;
+    if(style==="carpet"){f=nz*0.6+((x*3+y*5)%7)/26;}
+    else if(style==="tile"){const gx=x%21,gy=y%21;f=nz*0.25;if(gx<2||gy<2)f=-0.4;}
+    else if(style==="water"){f=Math.abs(Math.sin(x*0.2+nz*5))*0.6+nz*0.3;}
+    else if(style==="grass"){f=nz*0.9;}
+    else if(style==="parking"){
+      f=nz*0.35;
+      const laneY=y%20; // เส้นสีขาวคั่นช่องจอดทุก ๆ 20 พิกเซล
+      if(laneY<2)f=1.6;
+      const gx=x%32; if(gx<1)f=Math.max(f,0.5); // รอยต่อพื้นคอนกรีต
     }
+    r=lerp(r1,r2,clamp(f,0,1));g=lerp(g1,g2,clamp(f,0,1));b=lerp(b1,b2,clamp(f,0,1));
+    setPx(t,x,y,r,g,b);
+  }
+  return t;
+}
 
-    function render() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawBackground();
-      drawWalls();
-      drawKey();
-      drawExit();
-      drawEnemies();
-      drawMinimap();
+function makeCeil(c1,c2,seed,panel){
+  const S=64,t=T(S,S),n=noiseField(S,seed,3),[r1,g1,b1]=hex(c1),[r2,g2,b2]=hex(c2);
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+    const gx=x%32,gy=y%32;let f=n[y*S+x]*0.4;
+    let r=lerp(r1,r2,f),g=lerp(g1,g2,f),b=lerp(b1,b2,f);
+    if(gx<2||gy<2){r*=.6;g*=.6;b*=.6;}
+    if(panel&&gx>10&&gx<22&&gy>4&&gy<28){r=Math.min(255,r*2.6+70);g=Math.min(255,g*2.6+66);b=Math.min(255,b*2.2+40);}
+    setPx(t,x,y,r,g,b);
+  }
+  return t;
+}
 
-      const glow = ctx.createRadialGradient(
-        canvas.width * 0.5, canvas.height * 0.5, 0,
-        canvas.width * 0.5, canvas.height * 0.5,
-        Math.max(canvas.width, canvas.height) * 0.75
-      );
-      glow.addColorStop(0, 'rgba(255,255,255,0.02)');
-      glow.addColorStop(0.4, 'rgba(255,255,255,0.05)');
-      glow.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      if (player.flashlight) {
-        const radius = Math.min(canvas.width, canvas.height) * 0.34;
-        const gradient = ctx.createRadialGradient(
-          canvas.width / 2, canvas.height / 2, radius * 0.18,
-          canvas.width / 2, canvas.height / 2, radius
-        );
-        gradient.addColorStop(0, 'rgba(255,255,255,0.0)');
-        gradient.addColorStop(0.4, 'rgba(20,20,20,0.06)');
-        gradient.addColorStop(1, 'rgba(0,0,0,0.82)');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-
-      ctx.strokeStyle = 'rgba(255,255,255,0.26)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(canvas.width / 2 - 6, canvas.height / 2);
-      ctx.lineTo(canvas.width / 2 + 6, canvas.height / 2);
-      ctx.moveTo(canvas.width / 2, canvas.height / 2 - 6);
-      ctx.lineTo(canvas.width / 2, canvas.height / 2 + 6);
-      ctx.stroke();
-    }
-
-    function tick(now) {
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
-      if (messageTimer > 0) {
-        messageTimer -= dt * 1000;
-        if (messageTimer <= 0) hideMessage();
-      }
-      if (started && !gameOver && !win) updatePlayer();
-      render();
-      requestAnimationFrame(tick);
-    }
-
-    document.addEventListener('keydown', (e) => {
-      const key = e.key.toLowerCase();
-      if (['w','a','s','d','f','shift'].includes(key)) keysPressed[key] = true;
-      if (key === 'e' && Math.abs(player.x - keyPickup.x) < 0.8 && Math.abs(player.y - keyPickup.y) < 0.8 && !keyPickup.collected) {
-        keyPickup.collected = true;
-        player.keys += 1;
-        setMessage('Key acquired. Exit unlocked.');
-      }
-    });
-
-    document.addEventListener('keyup', (e) => {
-      const key = e.key.toLowerCase();
-      if (key in keysPressed) keysPressed[key] = false;
-    });
-
-    document.addEventListener('mousemove', (e) => {
-      if (!started || gameOver || win) return;
-      player.angle += e.movementX * 0.003;
-    });
-
-    startBtn.addEventListener('click', resetGame);
-    restartBtn.addEventListener('click', resetGame);
-    updateHud();
-    requestAnimationFrame(tick);
-  </script>
-  <script src="multiplayer.js"></script>
-</body>
-</html>
+/* RGBA sprite */
+function S32(w,h){return{w,h,d:new Uint8ClampedArray(w*h*4)};}
+// รูป Partygoer ที่ผู้ใช้ให้มา ฝังเป็น PNG 128x128 แล้วโหลดเข้า texture ของสไปรท์ทุกตัวทันทีที่ภาพพร้อม
+const PARTY_TEX=[];let PARTY_PIX=null;
+(function(){
+  const im=new Image();
+  im.onload=()=>{
+    const c=document.createElement("canvas");c.width=c.height=128;
+    const g=c.getContext("2d");g.drawImage(im,0,0);
+    PARTY_PIX=g.getImageData(0,0,128,128).data;
+    for(const T of PARTY_TEX)T.d.set(PARTY_PIX);
+  };
+  im.src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAABAE0lEQVR42u29ebRm11Uf+Nv7nHPv/YY3V9WrUkkqzfNg2XgAGzsxYAKx4xCbJmGxIJ2QhM7caTLQrO7VQ9JN0kA6ZAXSHSArgTAsTOx0CDFmssGzDZ4k27JmlWqe3vAN955z9t79x7nvqSRkqWRkS6qq6/UtuZ5effq+e/bdw2/v/fsBl6/L1+Xr0r3oa/Hm1v+zCh57Kt9c3dRXLzZhD8NqqDCzT9s5n3542j18ZDJvv9zfv3y9jAyAzju4/aNBdcfAvfJa7965l/nbRmQ3EZkHERQAk4PAMIV++limX/hSm/7z5yfdlzZj0qe/1+XrZWAAOwc2rit6w/LgT76iDv9sVfKrRAExhpFBRVSNAGaoAUTgwAZmhZnhRLL3/GHG//zJSfe5LqXLRvBVutxX6/APDevhn130//RObz8VlK/oxOUMpwpAATMCg4jUjEBEIILANJmlbGQLTLdd7+m/2xPc7IThE9MsSpfP66VtADuHf/vSaOUdi/Tb+5TfkaiOYmYO6kHKQkoGIYIBMBAZGAaDQQnExs7BWIBMxLgS9JZDgV9xBvQbZ7PMLx/ZS9QAdg7/6mEz+G/G9a+PCV8/oxCduMoZsVHx8wqCqYHP8+dGDDOAlMtHYgITMZQoMcclttuuYfuOc6B3n866fdkTvEQ9wEIV+O0Lzc/sMbxtaoiAVsQGMGACGAhEDBjB8OQLxGAwSlQAbPf/E4jgsrk48rzvEMlbz5j75dMis8tG8BI0gDctj950G7kfj+DonFUwlEPs3b2RQaHF4Vuf1BGVTJQAkAFkT/4+rE/8yCVYHHu/b6/jmx4U+5W5qF02gpeQAYy95zc31f/ZOH9bR6oGcQQHZx5kDCWFAVD0KT9K7of+qBUKo/7Qbec3y0tJAFGXyOW1KtwWVB99KOmny+9dvv44F79wlqRskg8JlNngvVVwcCgpn0CtHKcR8PRHtxiAQKm8jARKdt5LwExgJc5R9J6a/+9rA/bYH6OOJXqer682avZyN4AxsMjAtRkCheweKwBkMggYagyYBxmVYhAGouKGPBhOCU4JJSNwuy+nvtx+U85kyl4Xv27g/mZw7nljA73TKSHo+bz6JPd8g7gYLv+CGYDiqqEfrMNEyZQz+opfAWHAnXfLyJ4K8pYnmZ5ml0+9xQqGksAxcyLWqyv3d6509hOPiJx9PiDRTtQYNoGGjWNmghpgZk+JKNSnJ8Ezec0+thln59amp4WdlztA9YIZQMNuDGOYipKBxQGeHMgYYgkg1x+A4XzXbVbCgj7D8e+ciEKhILBjqBKL+uwgyzcGevMjEe96Pgdw9y171974yuV33nHj8uv3rg33hyHValkEyFCTnc8HA6cukhMbLYpb7CY53X9k9uHPPbz5ofse2vzIwyfboxutRrvsAfpDIxtFjmASkBq0pHlwPdCnqn1Z98zO8/y8wNR2jQMGiGOwGUiADgIRYOgqrOn0LbVzv9qJPOc5BO/wZ9588C1/7psO/sq1h4aLy8sewTPACmPefZrFGGrUG+oQqVXoXMDmccPX7bvnrW3+G90pwZce3v7g+z9z8pd/73Nn3vXAmfZ4zHJpVwH7ma+9uvHfqwQlYzYjOAXMGJEUoBLzeTftOw8L6OMs9YF2pxDU/mm0ggqgg8GBSrVggUgDf1Hyz3SqXxYm3rG3N79mz43f/x0HPk6Qehpzm8kQc1Qh0SSmOUMlqXadaTs37VrVdqYqnep8u8Pm8U07d+SszI62ahPBWqBDr7tt/du/8cqlv+2n08GxiXxkkjTTpeoBrJxXHxMJBn4y8y8tv93KnkBPfeLt/Iygz/fovJ+LwIxgDDA7qGQoBBXxrSuq65vAkWeL+USMN9y9+s6FcaXbU8ld1zWbGwmDvYvQ3jZFBZoFqQUkE8wIMQpMBCwMaxntyczbJyP8bAYXU0ZtOl5a8H/5Ndf+jyM6vPUv7z37T1X10qwCDCbFfRcXLqZIXOK76w8fBpjpLrzzRx7TnYTPFKpSftcUIMAxI4BhZiBmzmS5cdocrMJdz5XxDyqmvSv+RmWwC+DxMKAGoZ3PELuMFAVJMpIR2qhoZxndXJA6RcxAzgT2NZyvESeCeCoin8pejuTq3AMbuv3oifzqfcvfsT4eBLzMysUXzAAUSH1yxwCQTSGw/gf8lJRZTSHnvbQ0gnZf1heJ+rQMm87/91Ye3QWzm/AcmTgzoBAGEYwVZIrGBZAZkLUvVsrnVQE0GSwT2BwIDgyCOUYYD1ANPZQyMnL53q3xuVPJdye27l6CLF+yOEBSm5fGPpD6IKCqgAr6dkC5YbxziE/+D2qA9FWjAlI6BGAAbIDb+dtW/uwFYDNEEqjk5rlKvmmr9sjR7mPGGZ0SkjHUEogdIAZLGTkClAQuG6hl0JzByeBEoJYhlCCVIjrBHIa5OHTEsABO5PMAvtnv3d5L1gA6sy01UwLY9fg+2fP2ItD+8MuH23n+zscQAEcETyVTz3j2oEtUws7nH97+QEoZBMfa5yDOObDzMNISujpG3BCcfvgsjn/+ODaPbMEZEBrABUM98hAA7VzQzQSzeQJVjFAbautwrcMrn8sbXbRJYMe0JYbTDWifqCoD7PpsXqDPGhetLwN3oWIDuO8ZEFOfO5z3+8wFGkoGIteid8fPdj1xYn5sujWbUKBxElN4MMygjmBE4MxA8jj1wGkcu/cEnHqM1xcw3FNjsFSDAAy0RggBjggmggwgjAfwySM4xXjbVi5ZD7BpOLMt8gkP6uFSgmcuBvAcrmC3P0DYBYl2SsJneqKEACVCMAci113I55tM83xrMx5t24iuS7vQLqxPEozQzRLOHZli+4mE6dGMc4/OMD3XFuN0jDZluOBQ1R6iAnaEarmGLdaQxYB6kUeXrAHMVPVU1vf2LeDsXAUlArOB8OylUV80wsHgYfAAuAfc1QwCgKwASUoGqMCZg3INdW7jgjxUJNme4XRsAWmhSYrHYSJwdnDsATV084xpNkySot1skbcUdXCoGkNiQewSTp2dYisSZjOCoQKtk9qix2BYLzDzpWkAAHBM9HeSKAjek/ZVAAj8PKb56Mv8zOhJT0AFVuBkGWdzfvBCSi8R1Xae5qlL6Oax4Ara5x3cA1SZ0baKrc4wyYYYDXGjxcAF1N7DZcaJR8/hzJmErcg4N8vYnE1RLQTmRQeqMSDCpWsAT6g+sJ31U4HAUWO2ggCB6CsDHM0MRAQHKiViDyIRoGqJk8XZmZyfuJD3EoWJUCfZ0M4TVICcFW2MAARsGfN5wpntjNPRcCYKtpNAMkGyFig7E2YtcKbNOB0TTs8n6FRQLQ/hlx2owZDPg5UvKQMgAJui6dGUfpx1DmIDmwFgvBDYmJ7nAQwGhqC1/IVtwrkL61WUeTQzQhcFogRTQpzHUvcDmKUOmzljIyo2UsYkZ2xtTRFThHlDUsFmlzAhwbZ2mEkCKgYPCMN9A+y9Ym2h9o4uWQ8AAF9M8v91bT5RG7MRtOB+X1mjhPpST6H9VFGPHxhpA8Kpzt69bUgXVHoRgSGcoiAlRpeKRQVzUPMQeCAQ6mGAJwMrEAUg71HVDRAADAE/qKDEMPLgMECuFDQGMA4YLjTLTRVeVi7gBYSC+zzAsPWQ8I84YlZyyjDwCzK9V2BEU1MzcJcVh5V/TVQv6F4TAUzkqMQPiCjMgJwTtMvQqBiPGywuEBYrw6IPqMEYDuuSpGZGU3kcOLSMhWVC5RLG4wqjtSHCsIKQITS0PGi8ezl5AP9CvhkBUFV8Svhn98/TD44G1QElUcYfLzU20x5JKFkAO8dn5vETj6t+/kLfIzjipg4jFxjEAlVBFga3QJ4ZmhFjPGBcdc0Ikyem0G3C8ihgcY9HRkJOgnpY47o7l6Eyw+RMi33rq1g7tIKowjFl1JU/MB74GkC8JA1gxwsczXnrfrO/++rK/0oOnAXEfqe7Zwzqj9PoSbTwqU6if9qf7kkNUIIGVT6Z7Jc3zS7M/QMYDVy1OK4PzqLCBWYCIbcGPS3YfOw06oawetUY1x3ai0FqcOqJMxgOHVYOLSAiIQEwThjvM9z8dXuhmdGMGtDQkJKBOaCpea1i6htC9EebXhe7ATx5dMCnjd59cN79x6t5+OdmoExEHgY45wvgnwVg7GT1sHK4fd+AkMiQTVH1bWCDoTKvkVqedDK5P9svau/+7QI+z8JiGC4thwPdyQ5VHdBUHp4Yxx87h+kDHVIHHL9/C1fcuBfX37iOfdc0yJViuC8AZiB4ZFWgAmgBGDgPhoFIQF0DmXfQVrztjibYpecBdr42AZholg+p/8srbffqehiu6hSZoV4sAgQEJjgrzaEdjH8HndtpHTtmEDGEClSYKGsg8Q92+V89rnz0Qm7zzr8/uG+0PhzW3vuko5HjugHCULF6xTI2Pn8Us7MZ6Zzi5LEHcODQPhy66yDGVzKMEpAY5B3MCM48pIuIZKjYIU4UabIFnbaYJafSTwbZpRgCnm4ET6S88SGib3tD1k8HH1jEFARmdgADYk/Cv+jrfD2vc8hW3CiZwshnUuN5a8c+J+5Hk+XnNZB5zRX1HUvjCqcrqDrPLhDCsMLeO1cwP6t44DePQNqA+TTioc2TOHFyiv3HV3DwhjGW10dARQg+YHqqxdEvnUPlGky3z2L7TIJtbmJlEOD2DMv8wqWaBD6TEXwupvsG7L/5dYP4fu8CYHVmMW+uHws3gYcDiKE7wyI7q0JUGkkqpgMP1gz+ZEff86ik0xdy+DuhpQoO1185fE2oDMMxIyPA1xXUHGicsf8Vyzj90Cae+OwmSCtEE5x+osPW6VM4+cAGrr59P5b2L0OkxdaxCZ54ZBsbZ4+j3W7hpMIqGMO9wOJ6VYz7sgE81f1+MuoHlPkb7vT53WvBrxM5LUBMZiIpQNFOZ2a3lVw6iYks127gY4z4gy5+zx+Y/e4Fu9jeSlZGHA4suteqKkYLA3TCSE4wDB7OEsJYsXJ9g8MPnoLvhoiJypzAlLD5YMZnjjwCXqwwa2eIHWFjYhAVDDhgkQXZA3OLWFurvPN0aQNBz4jiqeKTs/yR32hxywPz2Y9pnrM3Y5CLQpV2zGhZIY5KTqAGUlMxyg7Ob07bs78zab/hg0n+Q5T8vMPr/tVmcWWxeoWoQwgVN8EQmIBKYMRQ57H/1n245pX74AYRQ09YbmoMnEcgAjrG1rGE+RmPjc2Aedcg5gpRGcqENMgI64wDN65Wg1FwO1XAZQN42nU0xo3/2tkPvneS7nxinn4PoMoIbED2RuqlHH5yyOSY2eCPzOJ/+a2uvfvTOX5ERL6i2/rK6xfeuLwShgJTdmVOIXCAEiBe4QbAcC9w1zdfhVd8+5VYuZ7g6jm87+A5A2RwLsAHh4FnjAJjHByGjjEYGa66bS/f8NrrdXigxmDoG3oZ7ZH5r+V/jABEEdwH3HtYu2+5I+bvuLUJP7bWhINQhZrBscGz90+0+WMPJP3hL0p+/7Y8OXR/oY9/mQQirA45vO625b9jgSG5U+LAcL6MlydDpITADmHIwMBww56DOHjLfpx7eILHv3QYpx6fYL4h0FYLGMSMigx1TdizNsKBGxZx/Z37Ue9lKAvWloeLZTq6tJoNTy64vBSvFyVjIQCdmRxWve9Itp/ukhypyF09qHmfEeV7t9MP/m6X/vrDqXsw6le2Bs5cEsDXXz9+5dvefPCfTF1UYjhTQiaHUDOGVQATQZOUkUQqewpcA+P9FdZvWMH+a1ew95oVjNYaiHXwtWFpLWD94AjX3r6OlesajPd7UC2yuLbA03N6+HP3b3xs2iV9+kDrS9Ep0Iv9H965ScvODb699vdvdemzv270VlV5CpCD5/HkU4kkOLg8aH74nVf/7o2vHr0mOVHJ6o08/HCIJjBqZyAPpJxA1BNSKNDNOgSuQAJQANgHSGTErQyZKWJMmLYt6mENP1RUIwZ5wnB1jLOHtX34M7Pf+NIx+YXPHT774fsfP3X8xNlpfqpnumwAT/0A/U35s1de/e+v3btv+Sc/++m3d5KNnqfLB568uTdcsTj4a++87p/+iTes/60ZnVOHwLOzEdMswNBjeVCjMgHVBDHbNTRTAUBIUaFqcMwwLmPoToGKPcwASQJyvoy1m4DIwQ0rWAZGVsPxEk5uRj12fPMPPnf/7N/+7scP/8fPP3L6RMz5JWUIL4milfrS786bb9cDkn6o297c2AR/qpOsF3r4OzdzuaHwjjdf9c0/+P03/9Ir7hm9vQudBvYsHUDG4NphuNhg1Hh472Bc/r7zDp4YqgKRgkWEEBBcmUv23gPMyFCAqEwUE8C1g6t6HhMK8BUh8jR3bqJcJ7d+YHTw9hv2/elX3LDyA+t7mkEWd++JM7NZGXa5bABPbdjE9Irl7TPftcfj22ad6Sno+58tgdpx9wZgWDv+5ruWX/f3v+fGX/ru77zph5bW3P6Yu2wGl2cEy4Bahh85DIYerAmz+RxZDI4YjkrtT+TKrqL2uwkMGMoyCcFAXHYZhRQUHIgYrge1VAD2HuyZ2YRjTNqmLEnbPFqsBzdet/ymV96y568sDqqTR07M753Oo77YRvCSMQDvPQ6ORq+dbG9Ojwr+98M5vmequn0hT/2dt66v/73vu/knf+Av3PwT1167euXZza28cWqKNGM36wiaEqZbE9S1R7NQwwGYn5tAUgIxIVAAjCBqEFUw027m7itfdghA8OwAA5IqzHGhwYgGygL2HpX3MDaoCRwxUiLKrXJWddlUBVGakR/ec9vBtx/aH+5+7MjWfz2zGbsX0wjcS8H9A8Chg1c1t915902/fv/9/8vjMX3+2Q6f+6dwOKj4nW+/5e1/5y/d8Z/vunXh9eemm/nE0U09e2rq0YLaWURCBqmh8R7DYYBYhkRD3oiomwGYHdIsImdB7reAdlfZQXBEIFWAGcQE7adTXdlPK+ttKWMuCjaAfLmrJIxsJb9IKQMiBGPOCRolpf1XLty+vkCueuxoete5rTa/WEbgXzLuf3GxWTiwd1mfIzPamei5/po9g7/83bf+X9/wqrW/EbfO4pEvbOWGB749m2HIkKBwg4DgalBW+EGN2WyKUPsyV6AESgQTRUwJJgwFIVSuxHso4MrUMHHJFRIExB7sCFBD5RzaLKAmoHEOOWVArHAjGUNzBpnCESNGRZdaOAyYSSoViXffvfdbvjfln/6Jn59939lJzC9GYuhfCh7AzDAYDevReLF6rtpeFbj7jisW//u/cufP33yte9uZ40fj9inx3MJvzbfgYoALDHhGbgFrDRpn2OIpqqHDwBk0RWTXoW4CRDNGC0MYHLbnc4gAZhnkAR88yJXVtCQJzjPYGKqKvoMBMoYPZf9BwH03MMCMIElhAjhyiDGim2d4UrjgEKNUo8Umv/quPd/9J+/Z/ne/+vtH33fRQ8HP3jlSg8nCcx3+19195Z4f+lu3/9Z1V3dv2zh9InLmyrVgbTNSVnSzOWYTQbftkLYMJ754FHZWYFMgbSimRxMmR6bIU4GRwtWlrMsSAcowS2AuWG7OClEroUEVWQQiGXmHvNqeDGEwIIQK3nswM0QERAxjj5QzSAkVeXhkQGfIqcN8q+NQD/TN37j3/zi4d9CU97vEDGAn2Tr8+OPnHj/82DRU1R+5BUzl8F9zz8H9P/jXbv39g+vp1XEyiwM3rtLMMN3chmiCVQyqDM1wjO3TM9g0QaeCjePb0GwwMUgSiCgGwyFC41ENahgzzBUaIxcY7BgpZ5gCkjK8c3COUYUA1TJMCiKoCogZjriHfAucnXKE9KQWogxyhQQpdcBsnuCJsDBoUJFx0lZvvGHpVW/5+r1/5nwc45IzgDNnzuS11b237d2zZ/n85JBKuMXXv/Kq/f/oB2766IF9+ZbpuZTTTKvpRov55gyVDxgNx/DeQQOjm83QndvG9MQmvHr4usbi0hBNFZC6DlESklPMTTDPbdlhcAxyDOcYBIFTAhKQsiJmQddldPOM3BksAdYZkAnMBOnBI6iBjUEAvANgCk0JEMN8Tnjk4ZPY3JwD5hBgGAwcupS4bUW/4e7xP77uyuHgfFDrkgoBKWcMqtHXeXZL56OEZsA9t61f+T/81Vs/eHCdDrXTNse5+DhlTDe3kNoOrIxuq4NuJ1jH6DamGCAgn81Isw7jfWN08znQCjgRKgpInQIUQFyQIGYGk4f3DWAOOQti22E+a5Gigs0DytBkSJ0hdorUKbp5gog
