@@ -88,7 +88,19 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
-    const contents = await fs.readFile(filePath);
+    let contents = await fs.readFile(filePath);
+    if (path.basename(filePath) === 'index.html') {
+      let html = contents.toString('utf8');
+      const scrollFix = `<style id="backrooms-scroll-fix">
+        .screen { place-items: unset; align-items: flex-start; justify-content: center; }
+        .screen.on { display: flex; }
+        .screen > .panel { margin-block: auto; flex: 0 0 auto; }
+      </style>`;
+      if (!html.includes('id="backrooms-scroll-fix"')) {
+        html = html.replace('</head>', `${scrollFix}</head>`);
+      }
+      contents = Buffer.from(html);
+    }
     res.writeHead(200, {
       'Content-Type': MIME_TYPES[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
       'X-Content-Type-Options': 'nosniff',
@@ -126,10 +138,6 @@ wss.on('connection', (socket) => {
       send(socket, { t: 'welcome', id: socket.id, room: room.name });
       broadcast(room, { t: 'join', id: socket.id, name: socket.playerName }, socket);
       broadcastPlayers(room);
-
-      // Joining an active game puts this player into the current level/map. The
-      // client's start button also sends nextLevel(0), so ignore that initial
-      // request to prevent a late joiner from resetting everyone to level 0.
       if (joiningRunningRoom) {
         socket.ignoreJoinStartRequest = true;
         sendCurrentLevel(socket, room);
@@ -143,7 +151,6 @@ wss.on('connection', (socket) => {
     if (message.t === 'nextLevel') {
       const requestedLevel = Number(message.lvl);
       if (!Number.isInteger(requestedLevel) || requestedLevel < 0 || requestedLevel > 10) return;
-
       if (socket.ignoreJoinStartRequest) {
         socket.ignoreJoinStartRequest = false;
         if (room.level !== requestedLevel) {
@@ -151,7 +158,6 @@ wss.on('connection', (socket) => {
           return;
         }
       }
-
       if (room.level === null || room.level !== requestedLevel) {
         room.level = requestedLevel;
         room.seed = Math.floor(Math.random() * 0x7fffffff);
