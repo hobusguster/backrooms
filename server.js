@@ -92,9 +92,26 @@ const server = http.createServer(async (req, res) => {
     if (path.basename(filePath) === 'index.html') {
       let html = contents.toString('utf8');
       const scrollFix = `<style id="backrooms-scroll-fix">
-        .screen { place-items: unset; align-items: flex-start; justify-content: center; }
-        .screen.on { display: flex; }
-        .screen > .panel { margin-block: auto; flex: 0 0 auto; }
+        .screen {
+          position: fixed !important;
+          inset: 0 !important;
+          height: 100vh !important;
+          height: 100dvh !important;
+          display: none;
+          overflow-x: hidden !important;
+          overflow-y: scroll !important;
+          place-items: unset !important;
+          align-items: flex-start !important;
+          justify-content: center !important;
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior-y: contain;
+          touch-action: pan-y;
+        }
+        .screen.on { display: flex !important; }
+        .screen > .panel {
+          flex: 0 0 auto !important;
+          margin: 28px auto !important;
+        }
       </style>`;
       if (!html.includes('id="backrooms-scroll-fix"')) {
         html = html.replace('</head>', `${scrollFix}</head>`);
@@ -104,6 +121,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, {
       'Content-Type': MIME_TYPES[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
       'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'no-store',
     });
     res.end(contents);
   } catch {
