@@ -33,25 +33,30 @@ function send(socket, payload) {
   if (socket.readyState === 1) socket.send(JSON.stringify(payload));
 }
 
-function playersPayload(room) {
-  return [...room.clients].map((client) => ({
-    id: client.id,
-    name: client.playerName,
-    x: client.x,
-    y: client.y,
-    ang: client.ang,
-    lvl: client.level,
-    san: client.sanity,
-  }));
+function broadcast(room, payload, except = null) {
+  for (const client of room.clients) if (client !== except) send(client, payload);
 }
 
 function broadcastPlayers(room) {
-  const payload = { t: 'players', list: playersPayload(room) };
-  for (const client of room.clients) send(client, payload);
+  const payload = {
+    t: 'players',
+    list: [...room.clients].map((client) => ({
+      id: client.id,
+      name: client.playerName,
+      x: client.x,
+      y: client.y,
+      ang: client.ang,
+      lvl: client.level,
+      san: client.sanity,
+    })),
+  };
+  broadcast(room, payload);
 }
 
-function broadcast(room, payload) {
-  for (const client of room.clients) send(client, payload);
+function sendCurrentLevel(socket, room) {
+  if (room.level !== null && room.seed !== null) {
+    send(socket, { t: 'seed', lvl: room.level, seed: room.seed });
+  }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -103,6 +108,7 @@ wss.on('connection', (socket) => {
   socket.level = 0;
   socket.sanity = 100;
   socket.lastChatAt = 0;
+  socket.ignoreJoinStartRequest = false;
 
   socket.on('message', (raw) => {
     let message;
@@ -113,12 +119,21 @@ wss.on('connection', (socket) => {
       if (socket.room) return;
       const roomName = String(message.room || 'main').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'main';
       const room = getRoom(roomName);
+      const joiningRunningRoom = room.level !== null;
       socket.room = room;
       socket.playerName = String(message.name || 'Player').trim().slice(0, 24) || 'Player';
       room.clients.add(socket);
       send(socket, { t: 'welcome', id: socket.id, room: room.name });
       broadcast(room, { t: 'join', id: socket.id, name: socket.playerName }, socket);
       broadcastPlayers(room);
+
+      // Joining an active game puts this player into the current level/map. The
+      // client's start button also sends nextLevel(0), so ignore that initial
+      // request to prevent a late joiner from resetting everyone to level 0.
+      if (joiningRunningRoom) {
+        socket.ignoreJoinStartRequest = true;
+        sendCurrentLevel(socket, room);
+      }
       return;
     }
 
@@ -129,14 +144,20 @@ wss.on('connection', (socket) => {
       const requestedLevel = Number(message.lvl);
       if (!Number.isInteger(requestedLevel) || requestedLevel < 0 || requestedLevel > 10) return;
 
-      // First player initializes the room. A level transition changes the shared seed
-      // for everyone; a player joining an already-running level receives its current seed.
+      if (socket.ignoreJoinStartRequest) {
+        socket.ignoreJoinStartRequest = false;
+        if (room.level !== requestedLevel) {
+          sendCurrentLevel(socket, room);
+          return;
+        }
+      }
+
       if (room.level === null || room.level !== requestedLevel) {
         room.level = requestedLevel;
         room.seed = Math.floor(Math.random() * 0x7fffffff);
         broadcast(room, { t: 'seed', lvl: room.level, seed: room.seed });
       } else {
-        send(socket, { t: 'seed', lvl: room.level, seed: room.seed });
+        sendCurrentLevel(socket, room);
       }
       return;
     }
