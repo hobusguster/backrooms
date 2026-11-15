@@ -8,66 +8,6 @@ import { WebSocketServer } from 'ws';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8080);
 const rooms = new Map();
-const SPAWNS = [
-  { x: 1.5, y: 1.5 },
-  { x: 2.5, y: 1.5 },
-  { x: 1.5, y: 2.5 },
-  { x: 2.5, y: 2.5 },
-];
-const INITIAL_ENEMIES = [
-  { x: 5.5, y: 5.5, hp: 100, active: true },
-  { x: 12.5, y: 9.5, hp: 100, active: true },
-  { x: 15.5, y: 14.5, hp: 100, active: true },
-];
-const KEY = { x: 9.5, y: 7.5 };
-const EXIT = { x: 16.5, y: 16.5 };
-
-function createRoom(name) {
-  return {
-    name,
-    clients: new Set(),
-    ownerId: null,
-    keyCollected: false,
-    winner: null,
-    winnerName: null,
-    enemies: INITIAL_ENEMIES.map((enemy) => ({ ...enemy })),
-  };
-}
-
-function getRoom(name) {
-  if (!rooms.has(name)) rooms.set(name, createRoom(name));
-  return rooms.get(name);
-}
-
-function safeSend(socket, payload) {
-  if (socket.readyState === 1) socket.send(JSON.stringify(payload));
-}
-
-function broadcast(room, payload, except = null) {
-  for (const client of room.clients) if (client !== except) safeSend(client, payload);
-}
-
-function membersPayload(room) {
-  return [...room.clients].map((client) => ({
-    id: client.id,
-    name: client.name,
-    x: client.x,
-    y: client.y,
-    angle: client.angle,
-    health: client.health,
-  }));
-}
-
-function statePayload(room) {
-  return {
-    type: 'game_state',
-    keyCollected: room.keyCollected,
-    winner: room.winner,
-    winnerName: room.winnerName,
-    enemies: room.enemies,
-  };
-}
-
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
@@ -79,6 +19,40 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
 };
+
+function getRoom(name) {
+  let room = rooms.get(name);
+  if (!room) {
+    room = { name, clients: new Set(), level: null, seed: null };
+    rooms.set(name, room);
+  }
+  return room;
+}
+
+function send(socket, payload) {
+  if (socket.readyState === 1) socket.send(JSON.stringify(payload));
+}
+
+function playersPayload(room) {
+  return [...room.clients].map((client) => ({
+    id: client.id,
+    name: client.playerName,
+    x: client.x,
+    y: client.y,
+    ang: client.ang,
+    lvl: client.level,
+    san: client.sanity,
+  }));
+}
+
+function broadcastPlayers(room) {
+  const payload = { t: 'players', list: playersPayload(room) };
+  for (const client of room.clients) send(client, payload);
+}
+
+function broadcast(room, payload) {
+  for (const client of room.clients) send(client, payload);
+}
 
 const server = http.createServer(async (req, res) => {
   let pathname;
@@ -96,7 +70,6 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, {
       'Content-Type': 'application/json; charset=utf-8',
       'Cache-Control': 'no-store',
-      'Access-Control-Allow-Origin': '*',
     });
     res.end(JSON.stringify(activeRooms));
     return;
@@ -124,135 +97,85 @@ const server = http.createServer(async (req, res) => {
 const wss = new WebSocketServer({ server, maxPayload: 16 * 1024 });
 wss.on('connection', (socket) => {
   socket.id = randomUUID();
-  socket.x = SPAWNS[0].x;
-  socket.y = SPAWNS[0].y;
-  socket.angle = 0;
-  socket.health = 100;
+  socket.x = 1.5;
+  socket.y = 1.5;
+  socket.ang = 0;
+  socket.level = 0;
+  socket.sanity = 100;
   socket.lastChatAt = 0;
 
   socket.on('message', (raw) => {
     let message;
     try { message = JSON.parse(raw.toString()); } catch { return; }
-    if (!message || typeof message.type !== 'string') return;
+    if (!message || typeof message.t !== 'string') return;
 
-    if (message.type === 'hello') {
-      if (socket.roomName) return;
-      const roomName = String(message.room || 'main')
-        .replace(/[^a-zA-Z0-9_-]/g, '')
-        .slice(0, 40) || 'main';
+    if (message.t === 'join') {
+      if (socket.room) return;
+      const roomName = String(message.room || 'main').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'main';
       const room = getRoom(roomName);
-      const spawn = SPAWNS[room.clients.size % SPAWNS.length];
-      socket.roomName = roomName;
-      socket.name = String(message.name || 'Guest').trim().slice(0, 24) || 'Guest';
-      socket.x = spawn.x;
-      socket.y = spawn.y;
+      socket.room = room;
+      socket.playerName = String(message.name || 'Player').trim().slice(0, 24) || 'Player';
       room.clients.add(socket);
-      if (!room.ownerId) room.ownerId = socket.id;
-
-      safeSend(socket, {
-        type: 'welcome',
-        id: socket.id,
-        room: roomName,
-        ownerId: room.ownerId,
-        members: membersPayload(room),
-        state: statePayload(room),
-      });
-      broadcast(room, {
-        type: 'member_joined',
-        member: {
-          id: socket.id,
-          name: socket.name,
-          x: socket.x,
-          y: socket.y,
-          angle: socket.angle,
-          health: socket.health,
-        },
-      }, socket);
+      send(socket, { t: 'welcome', id: socket.id, room: room.name });
+      broadcast(room, { t: 'join', id: socket.id, name: socket.playerName }, socket);
+      broadcastPlayers(room);
       return;
     }
 
-    if (!socket.roomName) return;
-    const room = rooms.get(socket.roomName);
+    const room = socket.room;
     if (!room) return;
 
-    if (message.type === 'player') {
+    if (message.t === 'nextLevel') {
+      const requestedLevel = Number(message.lvl);
+      if (!Number.isInteger(requestedLevel) || requestedLevel < 0 || requestedLevel > 10) return;
+
+      // First player initializes the room. A level transition changes the shared seed
+      // for everyone; a player joining an already-running level receives its current seed.
+      if (room.level === null || room.level !== requestedLevel) {
+        room.level = requestedLevel;
+        room.seed = Math.floor(Math.random() * 0x7fffffff);
+        broadcast(room, { t: 'seed', lvl: room.level, seed: room.seed });
+      } else {
+        send(socket, { t: 'seed', lvl: room.level, seed: room.seed });
+      }
+      return;
+    }
+
+    if (message.t === 'move') {
       const x = Number(message.x);
       const y = Number(message.y);
-      const angle = Number(message.angle);
-      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(angle)) return;
-      socket.x = Math.max(0, Math.min(20, x));
-      socket.y = Math.max(0, Math.min(19, y));
-      socket.angle = angle;
-      const health = Number(message.health);
-      if (Number.isFinite(health)) socket.health = Math.max(0, Math.min(100, health));
-      broadcast(room, {
-        type: 'player_update',
-        id: socket.id,
-        name: socket.name,
-        x: socket.x,
-        y: socket.y,
-        angle: socket.angle,
-        health: socket.health,
-      }, socket);
+      const ang = Number(message.ang);
+      const level = Number(message.lvl);
+      const sanity = Number(message.san);
+      if (![x, y, ang, level, sanity].every(Number.isFinite)) return;
+      socket.x = Math.max(0, Math.min(100, x));
+      socket.y = Math.max(0, Math.min(100, y));
+      socket.ang = ang;
+      socket.level = level;
+      socket.sanity = Math.max(0, Math.min(100, sanity));
+      broadcastPlayers(room);
       return;
     }
 
-    if (message.type === 'collect_key' && !room.keyCollected) {
-      if (Math.hypot(socket.x - KEY.x, socket.y - KEY.y) <= 1.2) {
-        room.keyCollected = true;
-        broadcast(room, statePayload(room));
-      }
-      return;
-    }
-
-    if (message.type === 'win' && room.keyCollected && !room.winner) {
-      if (Math.hypot(socket.x - EXIT.x, socket.y - EXIT.y) <= 1.3) {
-        room.winner = socket.id;
-        room.winnerName = socket.name;
-        broadcast(room, statePayload(room));
-      }
-      return;
-    }
-
-    if (message.type === 'game_reset' && socket.id === room.ownerId) {
-      room.keyCollected = false;
-      room.winner = null;
-      room.winnerName = null;
-      room.enemies = INITIAL_ENEMIES.map((enemy) => ({ ...enemy }));
-      broadcast(room, statePayload(room));
-      return;
-    }
-
-    if (message.type === 'chat') {
+    if (message.t === 'chat') {
       const now = Date.now();
       if (now - socket.lastChatAt < 400) return;
       socket.lastChatAt = now;
       const text = String(message.text || '').trim().slice(0, 140);
-      if (!text) return;
-      broadcast(room, {
-        type: 'chat',
-        id: socket.id,
-        name: socket.name,
-        text,
-      });
+      if (text) broadcast(room, { t: 'chat', id: socket.id, name: socket.playerName, text });
     }
   });
 
   socket.on('close', () => {
-    if (!socket.roomName) return;
-    const room = rooms.get(socket.roomName);
+    const room = socket.room;
     if (!room) return;
     room.clients.delete(socket);
-    broadcast(room, { type: 'member_left', id: socket.id, name: socket.name });
-    if (room.clients.size === 0) {
-      rooms.delete(socket.roomName);
-    } else if (room.ownerId === socket.id) {
-      room.ownerId = room.clients.values().next().value.id;
-      broadcast(room, { type: 'owner_changed', ownerId: room.ownerId });
-    }
+    broadcast(room, { t: 'leave', id: socket.id, name: socket.playerName });
+    if (room.clients.size === 0) rooms.delete(room.name);
+    else broadcastPlayers(room);
   });
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Backrooms multiplayer server listening on port ${PORT}`);
+  console.log(`Backrooms server listening on port ${PORT}`);
 });
